@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>OFFICE — demo v0.8.0.0.0</title>
+<title>OFFICE — demo v0.8.0.2</title>
 <style>
   html,body{margin:0;padding:0;background:#0a070f;color:#fff;}
   body{
@@ -71,6 +71,46 @@
     color:#ffe100; font-size:16px; letter-spacing:1px;
     min-width:52px; text-align:right;
   }
+  /* v0.9 · 常驻今日日程条 */
+  #todaysched{
+    width:960px; max-width:100%;
+    box-sizing:border-box;
+    border:2px solid #44384c;
+    border-radius:14px;
+    background:#0d0a14;
+    color:#cfc8d8;
+    font-size:14px; letter-spacing:1px;
+    padding:8px 14px;
+    margin-bottom:8px;
+    display:flex; align-items:center; gap:14px;
+    overflow-x:auto;
+  }
+  #todaysched .stitle{
+    color:#7bd0ff; letter-spacing:2px; font-size:13px;
+    border-right:1px solid #2a2434; padding-right:12px;
+    white-space:nowrap;
+  }
+  #todaysched .sentry{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:3px 8px; border-radius:6px;
+    background:#1a1326; border:1px solid #2c2238;
+    white-space:nowrap;
+  }
+  #todaysched .sentry .stime{ color:#ffe100; }
+  #todaysched .sentry .stxt{ color:#cfc8d8; }
+  #todaysched .sentry.now{
+    border-color:#ff77cc; background:#2a1424;
+  }
+  #todaysched .sentry.past{ opacity:0.45; }
+  #todaysched .sentry.boss{ border-color:#ff3355; }
+  #todaysched .sentry.work{ border-color:#ff9f00; }
+  #todaysched .sentry.life{ border-color:#5ad2ff; }
+  #todaysched .sentry .force{
+    color:#ff3355; font-size:11px; letter-spacing:1px;
+    border:1px solid #ff3355; border-radius:4px;
+    padding:0 4px; margin-left:4px;
+  }
+  #todaysched .sempty{ color:#5a5066; font-size:13px; }
 
   /* Stage / canvas */
   #stage{
@@ -642,13 +682,13 @@
 </head>
 <body>
 
-<h1 class="logo">OFFICE<small>独角兽网络 · 某 城 · 2026 · demo v0.8.0.0.0</small></h1>
+<h1 class="logo">OFFICE<small>独角兽网络 · 某 城 · 2026 · demo v0.8.0.2</small></h1>
 
 <div id="hud">
   <div class="group">
-    <span class="dayno" id="dayno">DAY 1/7</span>
+    <span class="dayno" id="dayno">DAY 1/15</span>
     <span class="clock" id="clock">MON · 09:00</span>
-    <span class="schedhint">[Tab] 日程</span>
+    <span class="schedhint">[Tab] 全部日程</span>
   </div>
   <div class="group">
     <span class="label">项目</span>
@@ -660,6 +700,12 @@
     <span class="mbti" id="mbtitxt">XXXX</span>
     <span class="state empty" id="statetxt">—</span>
   </div>
+</div>
+
+<!-- v0.9 · 常驻日程条 (今日日程) -->
+<div id="todaysched">
+  <span class="stitle">今日日程</span>
+  <span class="sempty">还没有解锁的日程。</span>
 </div>
 
 <div id="stage">
@@ -683,7 +729,7 @@
 
 <!-- Boot sequence (90s DOS 风, 不带 CRT 扫描线) -->
 <div id="bootSeq">
-  <div class="line dim" data-line="0">OFFICE.SYS · v0.8.0.0.0 · build 2026.04</div>
+  <div class="line dim" data-line="0">OFFICE.SYS · v0.8.0.2 · build 2026.04</div>
   <div class="line" data-line="1">&gt; BIOS check ................................. <span class="ok">[ OK ]</span></div>
   <div class="line" data-line="2">&gt; Loading sprites .............................. <span class="ok">[ OK ]</span></div>
   <div class="line" data-line="3">&gt; Loading schedule ............................. <span class="ok">[ OK ]</span></div>
@@ -821,13 +867,13 @@
   <div id="gridStack"></div>
   <div class="info">
     <div><span id="gridNow">0</span> / <span id="gridTotal">28</span></div>
-    <div class="hint">立 项 评 审 · 第 8 天</div>
+    <div class="hint">阶 段 评 审 · 第 8 天 · 终 评 · 第 15 天</div>
   </div>
 </div>
 
 <script>
 /* =========================================================
-   OFFICE  demo v0.8.0.0.0
+   OFFICE  demo v0.8.0.2
    ---------------------------------------------------------
    设定：
    - 主角生于 1996 前后，2026 年 30 出头。
@@ -955,8 +1001,8 @@ const ROOMS = {
     grid:[
       "###########",
       "#.CC.....B#",
-      "#........L#",
-      "#.........#",
+      "#....k...L#",
+      "#....k....#",
       "#####+#####",
       "###########",
     ],
@@ -1316,14 +1362,37 @@ function doWork(chosenFn, direction){
     : info.fail;
   const msg = tag + kindLabel + " ·  " + phaseName + dirTag + "  ·  " + sign + delta + " 格\n\n" + flavor;
 
+  /* v0.9: 第一次"带方向"工作（即 phase=dev 后），插入一段揭示提示。 */
+  const directionRevealStep = (direction && state.phase === "dev" && !state.flags.directionRevealShown)
+    ? [{type:"say", name:"系统",
+        text:"（你刚才选的方向，会决定 D"+state.finalReviewDay+" 终评时的项目类型。\n从今天起每一段方向都会被记下来。）"}]
+    : [];
+
   inject([
+    ...directionRevealStep,
     {type:"say", name:"* 工位", text: msg},
     {type:"act", fn:()=>{
       const focus = WORK_FOCUS_MAP[chosenFn];
       if(focus) state.projectFocus[focus] = (state.projectFocus[focus]||0) + 1;
+      if(direction) state.projectStyle.push(direction);
+      if(direction && state.phase === "dev") state.flags.directionRevealShown = true;
       advanceMinutes(time);
-      if(r.kind==="fail" && !state.specialState && Math.random() < 0.15) maybeEnterDepressed(1);
-      if(r.kind==="blunder" && !state.specialState && Math.random() < 0.25) maybeEnterDepressed(1);
+      /* v0.9: 工作连续失败 → 计入 workFailStreakDay；并入抑郁子条件 */
+      if(r.kind === "fail" || r.kind === "blunder"){
+        state.workFailStreakDay = (state.workFailStreakDay || 0) + 1;
+      } else {
+        state.workFailStreakDay = 0;
+      }
+      /* v0.9: 抑郁基线下调 + 引导期前 4 天屏蔽 */
+      const abnormalReady = (state.day >= (state.tutorial && state.tutorial.abnormalUnlockDay || 4));
+      if(abnormalReady && !state.specialState){
+        if(r.kind==="fail" && Math.random() < 0.05) maybeEnterDepressed(1);
+        if(r.kind==="blunder" && Math.random() < 0.10) maybeEnterDepressed(1);
+        if(state.workFailStreakDay >= 3 && Math.random() < 0.40){
+          maybeEnterDepressed(1);
+          state.workFailStreakDay = 0;
+        }
+      }
     }},
   ]);
 }
@@ -1411,6 +1480,13 @@ function saveRun(){
       npcBondRoute:state.npcBondRoute,
       elevatorAfterworkUsed:state.elevatorAfterworkUsed,
       projectFocus:state.projectFocus,
+      projectStyle:state.projectStyle,
+      phase:state.phase,
+      phaseBossDay:state.phaseBossDay,
+      finalReviewDay:state.finalReviewDay,
+      tutorial:state.tutorial,
+      workFailStreakDay:state.workFailStreakDay,
+      lastMeetingResult:state.lastMeetingResult,
       abnormalsHit:[...(state.abnormalsHit||[])],
     };
     localStorage.setItem(RUN_KEY, JSON.stringify(snap));
@@ -1454,6 +1530,15 @@ const ACHIEVEMENTS = {
   end_fail:        { name:"下 周 再 来", desc:"项目没立住，但你还在。"},
   end_fail_indie:  { name:"另 起 炉 灶", desc:"项目黄了，独立 demo 反而被人看见。"},
   end_fail_dep:    { name:"全 线 崩 溃", desc:"项目黄了，你也散架了。"},
+
+  /* — 结局: 阶段 Boss 不过 (v0.9 新) — */
+  end_phase_boss_fail: { name:"立 项 没 立 住", desc:"DAY 8 阶段 Boss 没扛过去，项目和团队一起散场。"},
+
+  /* — 结局: 独立游戏制作人 (v0.10 新) — */
+  end_indie_dev:   { name:"独 立 游 戏 制 作 人", desc:"你最终选择了离开公司，把那份「自己做」的火苗烧成了下一个工程。"},
+
+  /* — 小成就 (v0.10 新) — */
+  st_plane_watcher:{ name:"数 完 第 七 架", desc:"在天台上数完了第 7 架飞机。"},
 
   /* — 里程碑 — */
   first_run:       { name:"初 入 牢 笼", desc:"第一次开始这个游戏。"},
@@ -1569,32 +1654,41 @@ function isUnlocked(w){
   return state.unlockedJargon.has(w);
 }
 
-/* ===================== SCHEDULE ===================== */
+/* ===================== SCHEDULE (v0.9 · 15 天) ===================== */
 const BASE_SCHEDULE = [
-  // Day 1 MON
+  // Day 1 MON — 强制立项启动会
   {day:1, hour:9,  title:"打卡上班（你今天迟到了，还是早到了？）", category:"work", source:"自己", discovered:true, fixed:true},
-  {day:1, hour:14, title:"需求评审 · 工位组", category:"work", source:"日历", discovered:false},
+  {day:1, hour:10, title:"·  立  项  启  动  会  ·  全  员  ·", category:"boss", source:"上面", discovered:true, force:true, kind:"kickoff"},
   {day:1, hour:21, title:"《孤独摇滚》Live OAD 上线", category:"life", source:"自己", discovered:true},
   // Day 2 TUE
-  {day:2, hour:11, title:"跨部门同步会", category:"work", source:"邮件", discovered:false},
+  {day:2, hour:11, title:"跨部门同步会", category:"work", source:"邮件", discovered:false, force:true, kind:"sync"},
   {day:2, hour:19, title:"小偶像 ★染织 生日 SP 直播", category:"life", source:"自己", discovered:true},
   // Day 3 WED
-  {day:3, hour:15, title:"月度对齐会（主管说\"上面要听\"）", category:"boss", source:"主管", discovered:false},
+  {day:3, hour:15, title:"月度对齐会（主管说\"上面要听\"）", category:"boss", source:"主管", discovered:false, force:true, kind:"align"},
   {day:3, hour:22, title:"《MyGO!!!!!》第二季 · 第 6 话", category:"life", source:"自己", discovered:true},
   // Day 4 THU
-  {day:4, hour:14, title:"美术大返工评审", category:"work", source:"米米", discovered:false},
+  {day:4, hour:14, title:"美术大返工评审", category:"work", source:"米米", discovered:false, force:true, kind:"art"},
   {day:4, hour:20, title:"自己的独立游戏 demo · 提交 DDL", category:"life", source:"自己", discovered:true},
   // Day 5 FRI
   {day:5, hour:13, title:"周五午饭后困到溶解", category:"life", source:"自己", discovered:true},
-  {day:5, hour:18, title:"周五项目对齐 · 主管要看进度", category:"work", source:"主管", discovered:false},
+  {day:5, hour:18, title:"周五项目对齐 · 主管要看进度", category:"work", source:"主管", discovered:false, force:true, kind:"weekly"},
   // Day 6 SAT
   {day:6, hour:11, title:"周六加班（自愿，但不是真的自愿）", category:"work", source:"主管", discovered:false},
   {day:6, hour:21, title:"小偶像 ★染织 周末 livehouse", category:"life", source:"自己", discovered:true},
   // Day 7 SUN
   {day:7, hour:14, title:"评审前的最后冲刺", category:"work", source:"自己", discovered:true},
   {day:7, hour:23, title:"自己的独立游戏 demo · 提交 DDL", category:"life", source:"自己", discovered:true},
-  // Day 8 — 评审日
-  {day:8, hour:10, title:"·  项  目  立  项  评  审  ·", category:"boss", source:"上面", discovered:true},
+  // Day 8 — 阶段 Boss 立项评审
+  {day:8, hour:10, title:"·  阶段 Boss · 立  项  评  审  ·", category:"boss", source:"上面", discovered:true, force:true, kind:"phaseBoss"},
+  // === 第 2 阶段 · 开发期 D9–D15 (通过 D8 后才暴露)
+  {day:9,  hour:10, title:"开发期 Kickoff · 你正式进开发组", category:"boss", source:"上面",  discovered:false, force:true, kind:"devKickoff"},
+  {day:10, hour:14, title:"美术 / QA 协同 · 选个方向", category:"work", source:"米米", discovered:false, force:true, kind:"sync"},
+  {day:11, hour:11, title:"程序架构 review · 橙子主持", category:"work", source:"橙子", discovered:false, force:true, kind:"sync"},
+  {day:12, hour:15, title:"·  D12 中期评审 · 不淘汰但要看 ·", category:"boss", source:"上面",  discovered:false, force:true, kind:"midReview"},
+  {day:13, hour:14, title:"用户访谈 · 看现场反馈", category:"work", source:"自己", discovered:false},
+  {day:14, hour:18, title:"封版前夜 · 通宵候命", category:"work", source:"主管", discovered:false},
+  // Day 15 — 终评审 + 项目命名
+  {day:15, hour:10, title:"·  终  评  审  ·  项  目  命  名  ·", category:"boss", source:"上面", discovered:true, force:true, kind:"finalReview"},
 ];
 function discoverSchedule(matcher){
   for(const e of state.schedule){
@@ -1624,8 +1718,26 @@ function setState(name, hours){
   document.getElementById("statetxt").innerText = labels[name] || "—";
   document.getElementById("statetxt").classList.remove("empty");
   floatText("进入状态：" + (labels[name]||name));
+  /* v0.10: 异常状态首次进入时给一段教学（每周目每种 1 次） */
+  if(!state.tutorial) return;
+  if(!state.tutorial.hintsShown) state.tutorial.hintsShown = {};
+  const key = "enter_"+name;
+  if(state.tutorial.hintsShown[key]) return;
+  state.tutorial.hintsShown[key] = true;
+  const explain = {
+    depressed:"抑郁：移动会偶尔卡住，工作成功率下降。\n· 触发：连续 2 天加班 / 工作连续失败 3 次以上 / 看负面信息。\n· 缓解：去天台吹风、健身房跑步、茶水间吃饭，可清除。",
+    manic:    "亢奋：所有行动消耗时间 +40%，但工作出彩概率上升。\n· 触发：硬拉到极限、咖啡 ≥ 3 杯、livehouse 次日。\n· 缓解：去厕所释放、吸烟区呼气可清除。",
+    drunk:    "微醺：发言会偏离重点，但偶尔意外突破。\n· 触发：拉面 / 吃宵夜后 / 夜跑次日。\n· 缓解：自然耗散，不必特地处理。",
+    hallu:    "幻觉：HUD 数字会乱跳，房间里偶尔出现不存在的人。\n· 触发：连进 2 次睡眠仓 / 镜前发呆过久。\n· 缓解：天台、健身房可清除。",
+  }[name];
+  if(explain){
+    setTimeout(()=>{ try{
+      runScene([{type:"say", name:"系统", text:"——  异常状态 · "+(labels[name]||name)+"  ——\n\n"+explain}]);
+    }catch(e){} }, 50);
+  }
 }
 function clearState(){
+  const old = state.specialState && state.specialState.name;
   state.specialState = null;
   const el = document.getElementById("statetxt");
   if(state.anxietyActive){
@@ -1635,6 +1747,7 @@ function clearState(){
     el.innerText = "—";
     el.classList.add("empty");
   }
+  if(old) showToast("「"+stateLabel(old)+"」已经过去了。", "achv");
 }
 function tickState(hours){
   if(!state.specialState) return;
@@ -1647,6 +1760,16 @@ function tickState(hours){
 
 /* ===================== STATE ===================== */
 let state = freshState();
+/* v0.9: NG+ 把全部教学解锁前置到 D1，并允许 D2 起就用二级方向 */
+function applyNgPlusTutorial(s){
+  if((typeof META !== "undefined") && META && META.finishedRuns >= 1){
+    s.tutorial.workUnlockedDay = 1;
+    s.tutorial.abnormalUnlockDay = 1;
+    s.tutorial.affinityUnlockDay = 1;
+    s.tutorial.directionUnlockPhase = "intro";
+  }
+  return s;
+}
 function freshState(){
   const phases = {};
   for(const fn of FN_LIST) phases[fn] = { progress:0, max: PHASE_INFO[fn].max };
@@ -1664,11 +1787,26 @@ function freshState(){
     pendingDoor:null,
     npcOverride:[ { id:"tian", room:"male_pod", x:3, y:3 } ],
     day:1, hour:9, minute:0,
-    totalDays: 7,
+    /* v0.9: 15 天 + 双阶段 */
+    totalDays: 15,
+    phase: "intro",
+    phaseBossDay: 8,
+    finalReviewDay: 15,
+    /* v0.10: 教学阶梯 — 好感度延后到 D7 才出数值，NG+ 钩子会全部压到 1 */
+    tutorial: {
+      workUnlockedDay: 2,
+      abnormalUnlockDay: 4,
+      affinityUnlockDay: 7,
+      directionUnlockPhase: "dev",
+      hintsShown: {},   /* 各类教学提示是否已经投放过 */
+    },
     keywords:[],
     flags:{},
     npcLastHour:{},
     computerSessionsToday:0, coffeeToday:0, sleepPodToday:0,
+    /* v0.9: 异常状态触发计数（按天） */
+    workFailStreakDay:0,
+    lastMeetingResult:null,
     overtimeCount:0,
     overtimeStreak:0,
     depressedTimes:0,
@@ -1710,12 +1848,17 @@ function freshState(){
       art:0, qa:0, program:0, design:0,
       system:0, experience:0, coordination:0,
     },
+    /* v0.9: 二级方向标签累积，供 D15 终评命名做"风格"括号 */
+    projectStyle: [],
 
     /* project */
     project: { progress: 0, phases },
     canEndDay: false,  /* 18:00 之后才能从电梯主动下班 */
   };
 }
+/* 第一次构造完 state 之后立刻应用 NG+ 钩子（首次创建时 META 未必已就位，
+   稍后 saveMeta/loadMeta 后再 applyNgPlusTutorial(state) 一次也无害） */
+try { applyNgPlusTutorial(state); } catch(e){}
 
 /* ===================== HELPERS ===================== */
 let floaters = [];
@@ -1771,6 +1914,57 @@ function recordMemory(t){
     if(state.memoryFragments.length >= 3) state.amnesia = false;
     if(state.memoryFragments.length >= MEMORY_TOTAL) achv("memory_full");
   }
+}
+
+/* v0.10: 主角自白库 — 自嘲 / 兴奋 / 难过 / 躯体化
+   入参：mood = "selfdep"|"hyped"|"sad"|"soma"|"random"
+   返回：纯文本字符串，调用方自行 wrap 进 say 节点 */
+const MONOLOGUES = {
+  selfdep: [
+    "你 30 岁了。\n你以为这个年纪你会带团队，\n现在你连自己也带不动。",
+    "你打开 Boss 直聘。\n你看自己的简历。\n你给自己投了一份岗——\nHR 没回。",
+    "你想，如果今天回家路上车祸了，\n土狗第一反应可能是「这次需求要重排了」。",
+    "你说自己「热爱游戏」，\n但你已经记不起上一次玩通关一个游戏是什么时候。",
+    "你以为做这一行是因为你聪明。\n后来你才知道，\n是因为你便宜。",
+  ],
+  hyped: [
+    "你脑子里突然亮了一下。\n那个 demo 的玩法你想到了。\n你想立刻打开 unity。",
+    "你今天写代码异常顺。\n你怀疑自己是不是被附身了。",
+    "你站起来，走到饮水机，\n你听见自己心跳很快。\n你不是紧张，你是在期待。",
+    "群里有人发\"这版好像有点东西\"。\n你看了一眼那条消息。\n你笑了。",
+  ],
+  sad: [
+    "你坐下，关掉所有窗口。\n你只是想找一个理由继续坐着。",
+    "你想到一个曾经的同事。\n你不记得 ta 现在去哪了。\n你也不敢问。",
+    "你看了一眼窗外。\n天黑得太快了。\n你昨天下班的时候也是这样。",
+    "你想哭，但没有眼泪。\n你只是把屏幕调暗了一档。",
+  ],
+  soma: [
+    "你的右肩在跳。\n你按了按。\n你听见一声「咯」。",
+    "你最近在睡前会忽然抽气。\n体检说没事。\n你不太信。",
+    "你的胃又开始隐隐发疼。\n你已经一周没吃过准点的午饭。",
+    "你站起来，眼前黑了一秒。\n你扶住桌沿。\n你想，是不是该去医院。\n你想，明天再说。",
+    "你的牙关咬得很紧。\n你松开。\n几秒之后又咬上去。",
+  ],
+};
+function monologue(mood){
+  const pool = MONOLOGUES[mood] || (
+    [].concat(MONOLOGUES.selfdep, MONOLOGUES.hyped, MONOLOGUES.sad, MONOLOGUES.soma)
+  );
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+/* 在进入新房间时小概率播一段独白 */
+function maybeRoomEnterMonologue(roomId){
+  if(state.gameOver || scene) return;
+  if(Math.random() > 0.18) return;
+  let mood = "random";
+  if(state.specialState && state.specialState.name==="depressed") mood = "sad";
+  else if(state.specialState && state.specialState.name==="manic") mood = "hyped";
+  else if(state.anxietyActive) mood = "soma";
+  else if(state.day >= 10 && Math.random()<0.5) mood = "selfdep";
+  setTimeout(()=>{ try{
+    runScene([{type:"say", name:"*", text: monologue(mood)}]);
+  }catch(e){} }, 250);
 }
 
 /* ===================== TEXT TOKENIZE ===================== */
@@ -2082,41 +2276,207 @@ function advanceMinutes(m){
   if(state.specialState && state.specialState.name==="manic") m = Math.round(m * 1.4);
   state.minute += m;
   let triggered18 = false;
+  let forcedMeeting = null;
   while(state.minute >= 60){
     state.minute -= 60;
     state.hour++;
     tickState(1);
     state.npcLastHour = {};
+    /* v0.9: 强制日程触发 — 整点抵达即拉人进会议 */
+    if(!forcedMeeting){
+      forcedMeeting = scanForcedMeeting();
+    }
     if(state.hour === 18 && !state.flags["d"+state.day+"_18"]){
       state.flags["d"+state.day+"_18"] = true;
       state.canEndDay = true;
       triggered18 = true;
     }
-    if(state.hour >= 22){ updateHUD(); forceSleep(); return; }
+    /* v0.10: 20:00 整点 = 正式开始加班；夹带一次"现在还可以走"的提醒 */
+    if(state.hour === 20 && !state.flags["d"+state.day+"_20"]){
+      state.flags["d"+state.day+"_20"] = true;
+    }
+    /* v0.10: 25:00 (= 凌晨 1:00) 强制睡 */
+    if(state.hour >= 25){ updateHUD(); forceSleep(); return; }
   }
   updateHUD();
+  /* 强制会议优先于"18点电梯可走"和加班抑郁判定 */
+  if(forcedMeeting){
+    triggerForcedMeeting(forcedMeeting);
+    return;
+  }
   if(triggered18){
     floatText("18:00 · 电梯可下班");
     runScene([
       {type:"say", name:"系统",
-       text:"18:00。\n屏幕右下角弹出\"辛苦了\"。\n群里有人发\"哥们走了\"。\n\n（电梯按钮亮了。\n你可以去按它，结束今天。）"},
-      {type:"act", fn:()=>{
-        if(state.hour >= 18) state.overtimeCount; /* not yet overtime */
-      }},
+       text:"18:00。\n屏幕右下角弹出\"辛苦了\"。\n群里有人发\"哥们走了\"。\n\n（电梯按钮亮了。\n你可以去按它，结束今天。\n\n· 19:00 前下班 = 第二天的焦虑会缓解。\n· 20:00 之后还在工位 = 算加班，连续两天会进焦虑。）"},
     ]);
-  } else if(state.hour > 18 && !state.flags["d"+state.day+"_overtimeMark"]){
-    /* first work tick after 18:00 = officially overtime */
+  } else if(state.hour > 20 && !state.flags["d"+state.day+"_overtimeMark"]){
+    /* v0.10: 20:00 之后的第一次 work tick 才正式记一次加班 */
     state.flags["d"+state.day+"_overtimeMark"] = true;
     state.overtimeCount++;
-    if(!state.specialState && state.overtimeCount >= 2) maybeEnterDepressed(0.45);
+    /* 第一次跨过 20:00 的"加班引导提示"，每周目仅一次 */
+    if(!state.flags.hintOvertime){
+      state.flags.hintOvertime = true;
+      runScene([
+        {type:"say", name:"系统",
+          text:"——  21:00 不到，办公室的灯又亮回来了。  ——\n\n（你已经过了 20:00 还在工位。\n今天算加班一天。\n连续 2 天加班，明早开始焦虑。）"},
+      ]);
+    }
+    /* v0.9: 抑郁概率从 0.45 → 0.18，并由 maybeEnterDepressed 内部再 ×0.6 */
+    if(!state.specialState && state.overtimeCount >= 2) maybeEnterDepressed(0.18);
   }
 }
-function forceSleep(){
+
+/* v0.9 · 找到当前小时刚到点、需要强制触发的日程条目 */
+function scanForcedMeeting(){
+  for(const e of (state.schedule||[])){
+    if(!e.force) continue;
+    if(e.day !== state.day) continue;
+    if(e.hour !== state.hour) continue;
+    const flagKey = "metForced_d"+e.day+"_h"+e.hour;
+    if(state.flags[flagKey]) continue;
+    /* 自动设置已发现，让 UI 同步显示 */
+    e.discovered = true;
+    state.flags[flagKey] = true;
+    return e;
+  }
+  return null;
+}
+function triggerForcedMeeting(e){
+  /* D8 phaseBoss / D15 finalReview / D1 kickoff 已有专门 scene，这里跳过 */
+  if(e.kind === "phaseBoss"){ runReview(); return; }
+  if(e.kind === "finalReview"){ runFinalReview(); return; }
+  if(e.kind === "kickoff"){ /* D1 kickoff 由 introTianScene 已经触发 */ return; }
+  if(e.kind === "midReview"){ runMidReview(); return; }
+  if(e.kind === "devKickoff"){ runDevKickoff(); return; }
+  /* 普通强制会议：拉到会议室，做一次轮汇报 */
+  runForcedMiniMeeting(e);
+}
+/* v0.10: 会议每个 kind 一段不同的开场白 + 不同的影响 */
+const MEETING_FLAVORS = {
+  sync: {
+    intro:"开场是橙子。\n投影上是「本周燃尽图」。\n燃尽线和理想线之间，又拉开了。\n土狗坐在最后排，没看屏幕——\n他在看你。",
+    afterOk:"会议结束。\n土狗起身的时候拍了拍橙子的肩。\n你听见自己被点名了一句「这周还行」。\n（评审分 +1，进度 +1）",
+    afterVague:"会议结束。\n土狗没说话。\n橙子在你身边坐下，递过来一杯凉了的咖啡——\n「下次先讲数。」\n（评审分 +0，但你欠了橙子一次）",
+  },
+  art: {
+    intro:"白板上钉着 6 张概念图。\n4 张是别人的。\n你的那 2 张被翻在最下面——\n小林低头在抠袖口。",
+    afterOk:"会议结束。\n小林抬头看了你一眼，没说话，但抿了下嘴。\n（评审分 +1，美术方向偏好 +1）",
+    afterVague:"会议结束。\n小林一边收稿一边小声说「下次别让 PM 替我们讲。」\n你点头。\n（评审分 +0，与小林好感微 −1）",
+  },
+  qa: {
+    intro:"鱼刹把 bug 表打开。\n红色的占了 3/4 屏。\n他用一根手指划过这一列，没翻页。\n「这周。」",
+    afterOk:"会议结束。\n鱼刹合上电脑：「行，照这个先压。」\n（评审分 +1，QA 方向偏好 +1）",
+    afterVague:"会议结束。\n鱼刹没说话，把那张红表又拍了一下。\n（评审分 +0，QA 偏好仍未推进）",
+  },
+  align: {
+    intro:"这是「跨组对齐」。\n程序、美术、策划三方都坐了人。\n土狗站在白板前，把 3 张便利贴贴成一个三角。\n「今天我们要把这 3 个角对到 1 个点。」",
+    afterOk:"会议结束。\n三方都点了头。\n土狗用马克笔把那个点圈了出来——\n「明天起，所有人围着这个点干。」\n（评审分 +2，团队协作偏好 +1）",
+    afterVague:"会议结束。\n三方都说自己听懂了。\n你知道至少一方在撒谎。\n（评审分 +0，可能埋下后续返工）",
+  },
+  weekly: {
+    intro:"周会。\n所有人轮流开摄像头。\n土狗的摄像头是关的。\n他在群里只发了一句：「3 句话讲完，超时罚奶茶。」",
+    afterOk:"会议结束。\n群里弹了 3 个奶茶单。\n你不在那 3 个里。\n（评审分 +1）",
+    afterVague:"会议结束。\n群里弹了 5 个奶茶单。\n你在那 5 个里。\n（评审分 0，多扣 30 块奶茶钱）",
+  },
+};
+function runForcedMiniMeeting(e){
+  state.lastMeetingResult = null;
+  /* 把人物拽进会议室 */
+  if(typeof changeRoom === "function" && state.player && state.player.room !== "meeting"){
+    changeRoom("meeting", 5, 5);
+  }
+  scene = null;
+  document.getElementById("dialogue").classList.add("show");
+  const flavor = MEETING_FLAVORS[e.kind] || MEETING_FLAVORS.sync;
+  /* 影响：ok = 进度 +1 + 评审分 +1，vague = 进度 0 + 抑郁微概率 */
+  const applyOk = (focusKey, npcId) => () => {
+    state.flags.reviewBonus2 = (state.flags.reviewBonus2||0) + 1;
+    state.lastMeetingResult = "ok";
+    if(focusKey && state.projectFocus){
+      state.projectFocus[focusKey] = (state.projectFocus[focusKey]||0) + 1;
+    }
+    if(state.project) state.project.progress = Math.min((state.project.progress||0) + 1, state.phase==="dev"?28:28);
+    if(npcId) adjustNpcAffinity(npcId, "Te", "primary");
+    advanceMinutes(60);
+  };
+  const applyVague = () => {
+    state.lastMeetingResult = "vague";
+    advanceMinutes(60);
+  };
   runScene([
     {type:"say", name:"系统",
-     text:"22:00。\n大多数灯都灭了。\n空调被关了，风变冷。"},
+     text:"——  "+String(e.hour).padStart(2,"0")+":00  ·  "+e.title+"  ——\n\n你被群里 @ 了。\n会议室门开着——\n大家都进去了，没人留下你的位置。"},
+    {type:"say", name:"* 会议室", text: flavor.intro},
+    {type:"choice", name:"* 会议室", showAll8:true,
+      prompt:"你在会上怎么发言？\n（每个选项右上角的「⋯」是它对项目/同事的暗示。）",
+      options8:{
+        Te:{ text:"先报本周风险与里程碑    ⋯ 评审 +1 / 进度 +1", fn: applyOk("design", null) },
+        Ti:{ text:"先讲指标与样本量            ⋯ 评审 +1 / QA 偏好 +1", fn: applyOk("qa", "yusha") },
+        Si:{ text:"逐条复盘上一段所有改动 ⋯ 评审 +1 / 系统偏好 +1", fn: applyOk("system", null) },
+        Ne:{ text:"先讲愿景跟用户情绪      ⋯ 看起来很燃，但听起来很虚", fn: applyVague },
+        Fe:{ text:"先感谢各部门并背锅      ⋯ 评审 +1 / 协作偏好 +1", fn: applyOk("coordination", null) },
+        Fi:{ text:"先讲作品表达和价值      ⋯ 走心，但土狗想看数据", fn: applyVague },
+        Se:{ text:"现场演示一下手感变化    ⋯ 评审 +1 / 体验偏好 +1", fn: applyOk("experience", null) },
+        Ni:{ text:"讲半年后的产品路径      ⋯ 远但模糊", fn: applyVague },
+      }},
+    {type:"act", fn:()=>{
+      if(state.lastMeetingResult === "vague"){
+        const abnormalReady = (state.day >= (state.tutorial && state.tutorial.abnormalUnlockDay || 4));
+        if(abnormalReady && !state.specialState && Math.random() < 0.10){
+          maybeEnterDepressed(0.15);
+        }
+      }
+    }},
+    {type:"say", name:"系统",
+     text: state.lastMeetingResult === "ok" ? flavor.afterOk : flavor.afterVague},
+  ]);
+}
+/* D9 开发期 Kickoff — 揭示二级方向 */
+function runDevKickoff(){
+  if(typeof changeRoom === "function" && state.player && state.player.room !== "meeting") changeRoom("meeting", 5, 5);
+  scene = null;
+  document.getElementById("dialogue").classList.add("show");
+  runScene([
+    {type:"say", name:"系统",
+     text:"——  DAY 9  ·  开 发 期  Kickoff  ——\n\n白板上写着「Phase 2 · DEV · D9 ~ D15」。\n土狗罕见地没说脏话。"},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"行,立项过了。\n现在你们是真做事了。\n从今天起每段工作要选一个'方向'。\n方向写在哪儿，D15 终评看哪儿。"},
+    {type:"say", name:"橙子 / 主策",
+     text:"翻成人话——\n你之前每段工作只是\"做\"。\n现在每段工作还要附一个\"做成什么样\"。\n美术、QA、程序、设计这些方向，会在 D15 决定项目长成什么样子。"},
+  ]);
+}
+/* D12 中期评审（小 Boss · 不淘汰，只读分） */
+function runMidReview(){
+  if(typeof changeRoom === "function" && state.player && state.player.room !== "meeting") changeRoom("meeting", 5, 5);
+  state.flags.reviewBonus2 = state.flags.reviewBonus2 || 0;
+  scene = null;
+  document.getElementById("dialogue").classList.add("show");
+  runScene([
+    {type:"say", name:"系统",
+     text:"——  DAY 12  ·  中 期 评 审  ——\n\n这次不淘汰人。\n但土狗会看一眼分数。"},
+    {type:"choice", name:"土狗 / 总制作人", prompt:"中期评审：你这 3 天最大的进展是？", options8:{
+      Te:{ text:"风险下降 + 里程碑达成", fn:()=>{ state.flags.reviewBonus2 += 3; }},
+      Ne:{ text:"出现了一个新玩法点",     fn:()=>{ state.flags.reviewBonus2 += 2; }},
+      Fi:{ text:"作品调性更清晰了",       fn:()=>{ state.flags.reviewBonus2 += 1; }},
+      Ti:{ text:"系统/数值跑通",           fn:()=>{ state.flags.reviewBonus2 += 2; }},
+      Si:{ text:"老坑都清了",               fn:()=>{ state.flags.reviewBonus2 += 2; }},
+      Fe:{ text:"团队气氛变了",             fn:()=>{ state.flags.reviewBonus2 += 1; }},
+      Se:{ text:"手感真的变了",             fn:()=>{ state.flags.reviewBonus2 += 2; }},
+      Ni:{ text:"半年后的形态我能讲清",     fn:()=>{ state.flags.reviewBonus2 += 2; }},
+    }},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"行。\nD15 见。\n那一关才是真正的命名局。"},
+    {type:"act", fn:()=>{ advanceMinutes(60); }},
+  ]);
+}
+function forceSleep(){
+  /* v0.10: 一天最晚可以加班到凌晨 1:00 (= 25:00) */
+  runScene([
+    {type:"say", name:"系统",
+     text:"01:00。\n你身边只剩下打印机的待机灯。\n保安在门口看了你一眼，没说什么。"},
     {type:"say", name:"*",
-     text:"你听见自己很慢地呼吸。\n你不想动。"},
+     text:"你听见自己很慢地呼吸。\n你不想动。\n（再撑下去身体会替你做决定。）"},
     {type:"act", fn:()=>{ endOfDay("crashed"); }},
   ]);
 }
@@ -2156,13 +2516,27 @@ function dismissDaySummary(){
   state.day++;
   state.hour = 9; state.minute = 0;
   state.computerSessionsToday = 0; state.coffeeToday = 0; state.sleepPodToday = 0;
+  state.workFailStreakDay = 0;
   state.npcLastHour = {};
   state.canEndDay = false;
+  state.flags.day1Locked = false;  /* D1 锁在 D1 结束后释放 */
   if(state.specialState) clearState();
   updateHUD(); draw();
-  if(state.day > state.totalDays){
-    runReview();
-    return;
+  /* v0.9: 阶段 Boss = D8；终评 = D15。预先标记日程强制触发已用过，避免双触发。 */
+  if(state.day === state.phaseBossDay && state.phase === "intro"){
+    state.flags["metForced_d"+state.phaseBossDay+"_h10"] = true;
+    runReview(); return;
+  }
+  if(state.day === state.finalReviewDay){
+    state.flags["metForced_d"+state.finalReviewDay+"_h10"] = true;
+    runFinalReview(); return;
+  }
+  /* 兜底：如果某种异常导致 day 越过了 phaseBossDay 但 phase 还在 intro */
+  if(state.day > state.phaseBossDay && state.phase === "intro"){
+    runReview(); return;
+  }
+  if(state.day > state.finalReviewDay){
+    runFinalReview(); return;
   }
   const wakeLines = [
     "你又在工位醒来。\n屏幕还亮着。",
@@ -2170,17 +2544,31 @@ function dismissDaySummary(){
     "你睁开眼。\n阳光从百叶窗的缝里漏进来。\n你不记得自己是不是真的休息了。",
     "你醒来。\n手机锁屏上还是昨晚的群消息。",
   ];
+  /* v0.10: 应用昨天 livehouse / arcade / ramen / park 等夜活动留下的 buff（次日全天） */
+  let buffNote = null;
+  if(state.flags.tomorrowBuff && !state.specialState){
+    const buffName = state.flags.tomorrowBuff;
+    setState(buffName, 12);
+    const buffDesc = {
+      manic: "你今天会异常亢奋。\n手指停不下来，但人也容易蹦得太高摔下来。",
+      hallu: "你今天会偶尔看到不存在的东西。\n注意——别在会议上说出来。",
+      drunk: "你今天身上还带着昨晚的余味。\n说话偏离重点，但你不太在乎。",
+    }[buffName] || "";
+    buffNote = "昨晚的余震还在。\n"+buffDesc;
+    state.flags.tomorrowBuff = null;
+  }
   runScene([
     {type:"say", name:"系统",
      text:"——  DAY "+state.day+" · "+WEEK[(state.day-1)%7]+"  ——\n"+wakeLines[Math.floor(Math.random()*wakeLines.length)]},
     ...(state.flags.anxietyJustTriggered ? [{
       type:"say", name:"系统",
-      text:"你连续两天都加班到很晚。\n你开始焦虑。\n从今天起，HUD 里的 Day 会偶尔乱跳。"
+      text:"你连续两天都加班到很晚。\n你开始焦虑。\n从今天起，HUD 里的 Day 会偶尔乱跳。\n\n（19:00 之前下班 = 第二天直接清焦虑。）"
     }] : []),
     ...(state.flags.anxietyClearedToday ? [{
       type:"say", name:"系统",
       text:"你终于缓下来了一点。\n第二天早上，日期不再乱跳。\n焦虑状态解除。"
     }] : []),
+    ...(buffNote ? [{type:"say", name:"系统", text: buffNote}] : []),
   ]);
   state.flags.anxietyJustTriggered = false;
   state.flags.anxietyClearedToday = false;
@@ -2306,6 +2694,8 @@ function changeRoom(roomId, x, y){
   p.moving = false; p.moveT = 0;
   /* 进入新房间随机偷听 / 触发事件 */
   maybeRoomEnterEvent(roomId);
+  /* v0.10: 偶尔补一段主角独白 */
+  if(typeof maybeRoomEnterMonologue === "function") maybeRoomEnterMonologue(roomId);
   draw(); updateHUD();
 }
 
@@ -2329,6 +2719,7 @@ function tryInteract(){
   if(t==="P") return interactPrinter();
   if(t==="B") return interactBoard();
   if(t==="L") return interactSofaForum();
+  if(t==="k") return interactPantryTable();
   if(t==="N") return interactNoticeBoard();
   if(t==="m") return interactMirror();
   if(t==="w") return interactWindow();
@@ -2372,7 +2763,8 @@ const NPCS = [
                13:["work_area",   8,1],
                15:["pantry",      8,2],
                16:["work_area",   8,1],
-               17:["work_area",   8,1] } },
+               17:["work_area",   8,1],
+               20:["gym",         7,3] } },
   { id:"cheng", name:"橙子 / 主策",           color:"#c67b3a", hair:"#3a251a", mbti:"ENTJ", likes:["Te","Ni","Fe"], dislikes:["Si"],
     schedule:{ 10:["meeting",     5,3],
                11:["meeting",     5,3],
@@ -2388,9 +2780,11 @@ const NPCS = [
                14:["work_area",   8,4],
                15:["pantry",      8,1] } },
   { id:"yusha", name:"Yusha / 资深美术",      color:"#768a4a", hair:"#241e12", mbti:"ENFJ", likes:["Fe","Fi","Si"], dislikes:["Ti"],
-    schedule:{ 13:["work_area",   2,4],
+    schedule:{ 12:["gym",         3,3],
+               13:["gym",         3,3],
                16:["smoking",     7,2],
-               17:["rooftop",     7,4] } },
+               17:["rooftop",     7,4],
+               19:["gym",         5,3] } },
   { id:"ayi",   name:"保洁阿姨",               color:"#456a9a", hair:"#888888", mbti:"ESFJ", likes:["Fe","Si","Se"], dislikes:["Ni"],
     schedule:{ 12:["corridor_2f", 7,3],
                13:["restroom_2f", 5,2],
@@ -2453,12 +2847,127 @@ function getNpcById(id){
 function npcBondFlavor(n){
   const route = state.npcBondRoute && state.npcBondRoute[n.id];
   if(route==="romance"){
-    return "你们现在会在路过彼此时，用那种只有你们懂的眼神点头。";
+    return state.phase === "dev"
+      ? "你们已经过了那种偷瞄的阶段。\n现在是真的会在加班里互相递水的关系了。"
+      : "你们现在会在路过彼此时，用那种只有你们懂的眼神点头。";
   }
   if(route==="bestie"){
-    return "你们已经是挚友了。就算不说话，也知道彼此今天撑不撑得住。";
+    return state.phase === "dev"
+      ? "你们是这个项目里少数几个还能笑出来的搭档。\n崩了一起背锅，过了一起去喝。"
+      : "你们已经是挚友了。就算不说话，也知道彼此今天撑不撑得住。";
   }
   return null;
+}
+/* v0.9 · 阶段+好感分层前奏台词
+   分层：低 (0-15) / 中 (16-30) / 高 (31-50)
+   阶段：intro (D1-D8) / dev (D9-D15) */
+function phaseAffinityIntro(n){
+  if(!state.phase) return null;
+  const fav = (state.npcAffinity && state.npcAffinity[n.id]) || 0;
+  const tier = fav <= 15 ? "low" : (fav <= 30 ? "mid" : "high");
+  const PHRASES = {
+    tian: {
+      intro: {
+        low:  "（田只在路过时点了个头。）\n他还没把你当自己人。",
+        mid:  "你最近在玩什么？\n我又把 [[蓝档案]] 卸了。",
+        high: "你昨晚是不是又看了 livehouse 录播？\n群里你最后一条消息时间不太对。",
+      },
+      dev: {
+        low:  "立项过了，\n我就还能再赖几个月。\n你呢？",
+        mid:  "下半场我们排了通宵班。\n你那段如果做不完，我可以替你扛一晚。",
+        high: "终评那天我穿一身黑。\n如果它没过——\n至少我们彼此别道歉。",
+      },
+    },
+    lin: {
+      intro: {
+        low:  "你也是来打卡的？\n打卡机有点抽风。",
+        mid:  "我昨晚算了下，\n再撑两年就到 [[35岁]] 了。\n你呢？",
+        high: "如果某天我突然不来上班——\n你别担心。\n那是我自己选的。",
+      },
+      dev: {
+        low:  "立项过了，\n我以为我会松口气。\n结果没有。",
+        mid:  "你这几天的方向选得有点乱。\n我帮你画了张表，待会发你。",
+        high: "如果终评那天 [[N+1]] 真的来——\n你别一个人扛。\n我们都还在。",
+      },
+    },
+    mimi: {
+      intro: {
+        low:  "我手稿没改完。\n少说两句。",
+        mid:  "你看过我推上的同人吗？\n那个评论区有人在骂我。",
+        high: "我画了一张你。\n别问我什么时候发。\n它只是\"画了\"。",
+      },
+      dev: {
+        low:  "美术资源还差三组。\n你别催。",
+        mid:  "你刚才选的方向——\n美术能扛。\n但 QA 那边可能要先调班。",
+        high: "终评那天，\n我会把那张\"你\"挂在工位。\n就算只挂一个上午也算。",
+      },
+    },
+    zheye: {
+      intro: {
+        low:  "……",
+        mid:  "今天循环 [[MyGO]]。\n第二季的 \"碧海风\"。",
+        high: "我硬盘里那个 prototype——\n等终评结束，\n我可以打开给你看。",
+      },
+      dev: {
+        low:  "……\n架构 review 我已经熬完了。\n你别问我话。",
+        mid:  "你这段如果走系统深度，\n我能给你写一套表。\n你别走别的方向。",
+        high: "终评那天，\n如果你走出去——\n我跟你一起走那条夜路。",
+      },
+    },
+    cheng: {
+      intro: {
+        low:  "你来一下，\n我有几个排期要对。",
+        mid:  "我给你单独留了两段时间。\n别浪费。\n你不是来浪费时间的人。",
+        high: "如果土狗下次再说\"全做出来\"——\n你点头就行。\n剩下的我处理。",
+      },
+      dev: {
+        low:  "你有 4 段方向窗口。\n每一段都得挑一个方向。",
+        mid:  "你这两段方向选得稳。\n我会在终评帮你把这条线讲透。",
+        high: "终评那天，\n我说"+`"主笔是 ta"`+"。\n你只要不否认就行。",
+      },
+    },
+    tugou: {
+      intro: {
+        low:  "你是哪个项目过来的？\n名字别给我，给我做点东西。",
+        mid:  "你这套 PPT 比上一版顺一点。\n但还不够\"野\"。",
+        high: "你是来对的项目了。\n这种"+`"什么都能干一点"`+"的——\n以前我也是。",
+      },
+      dev: {
+        low:  "立项过了不代表你过了。\n你给我把那段重写。",
+        mid:  "你这版我看到野心了。\n野心要落地，不是靠开会，是靠你自己加那一晚的班。",
+        high: "终评那天，\n你来站到台前。\n我让你站。",
+      },
+    },
+    yusha: {
+      intro: {
+        low:  "我先做事。\n聊天等下班。",
+        mid:  "你这套思路跟我以前那个项目像。\n不是夸你。",
+        high: "我以前那个项目散了之后，\n我没再写过 design doc。\n你这个项目让我又想写了。",
+      },
+      dev: {
+        low:  "你方向选完之后，\n我帮你把 design doc 补好。",
+        mid:  "你这段方向选得对。\n再走两段，\n这个项目我就敢说"+`"它是个东西"`+"了。",
+        high: "如果它最后真过了——\n我把那一版散掉的项目的 doc 也烧了。\n那一段算我们俩一起翻篇。",
+      },
+    },
+    gz: {
+      intro: {
+        low:  "排期。\n排期。\n再排期。\n你别打断我。",
+        mid:  "你昨天那段时间表对得上。\n你比上一个那个 PM 强。",
+        high: "我妈下周复查。\n如果终评那天我请假——\n你帮我顶一下汇报。",
+      },
+      dev: {
+        low:  "你方向不定，\n我管线就不能动。\n你尽快。",
+        mid:  "你方向定下来之后，\n我把整条管线给你压一压。\n你那一段会快很多。",
+        high: "我妈那边好转了。\n所以——\n终评那天我会到。\n陪你站完最后一会儿。",
+      },
+    },
+  };
+  const set = PHRASES[n.id];
+  if(!set) return null;
+  const phaseSet = set[state.phase];
+  if(!phaseSet) return null;
+  return phaseSet[tier] || null;
 }
 function adjustNpcAffinity(npcId, fnTag, group){
   if(!npcId || !fnTag || fnTag==="--") return;
@@ -2477,11 +2986,39 @@ function adjustNpcAffinity(npcId, fnTag, group){
   const nowV = clamp(oldV + delta, 0, 50);
   state.npcAffinity[npcId] = nowV;
   const sign = nowV-oldV >= 0 ? "+" : "";
-  showToast(npcNameShort(n)+" 好感 " + sign + (nowV-oldV) + " · " + nowV + "/50", "note");
+  /* v0.10: affinityUnlockDay 之前 / 一周目，完全隐藏数值，只用模糊文字 */
+  const affDay = (state.tutorial && state.tutorial.affinityUnlockDay) || 7;
+  const reveal = (state.day >= affDay) || (META && META.finishedRuns >= 1);
+  if(reveal){
+    showToast(npcNameShort(n)+" 好感 " + sign + (nowV-oldV) + " · " + nowV + "/50", "note");
+  } else {
+    /* v0.10: 首次改变 = 投放一次教学提示（每周目仅一次）*/
+    if(!state.tutorial.hintsShown.affinityFirst){
+      state.tutorial.hintsShown.affinityFirst = true;
+      showToast("你和 ta 之间，多了点什么。\n（D"+affDay+" 起，好感系统会以数字呈现）", "achv");
+    }
+    const word = (nowV-oldV >= 2) ? "对你的态度更亲近了一些" :
+                 (nowV-oldV >= 1) ? "看你的眼神变了一下" :
+                 (nowV-oldV >= -1) ? "稍稍皱了下眉" : "明显冷了下来";
+    showToast(npcNameShort(n)+"  "+word, "note");
+  }
   if(oldV < 40 && nowV >= 40 && !state.flags["bond_unlock_"+npcId]){
     state.flags["bond_unlock_"+npcId] = true;
-    showToast(npcNameShort(n)+"：好感达到 40，可选浪漫或挚友线", "achv");
+    showToast(npcNameShort(n)+"：你们之间已经不只是同事了。", "achv");
   }
+}
+
+/* v0.10: D7 第一次说话时，弹一次"好感解锁"科普 */
+function maybeShowAffinityUnlockTutorial(){
+  const affDay = (state.tutorial && state.tutorial.affinityUnlockDay) || 7;
+  if(state.day < affDay) return;
+  if(state.tutorial.hintsShown.affinityUnlock) return;
+  if((typeof META !== "undefined") && META.finishedRuns >= 1) return;
+  state.tutorial.hintsShown.affinityUnlock = true;
+  runScene([
+    {type:"say", name:"系统",
+      text:"——  好感度系统 · 解锁  ——\n\n这一周你和同事打过的每一段交集，都被悄悄记了一笔。\n\n· 每个 NPC 都有 0–50 的好感。\n· 你说话用的功能（Te/Fi/Ne…），如果是 ta 喜欢的，就 +2；不喜欢的 −2。\n· 满 40 之后，你可以选择把关系推向「浪漫」或「挚友」。\n· 性别不限，主角的性别始终是你自己脑里的样子。\n\n现在数字会出现在右上角的 toast 里。"},
+  ]);
 }
 
 /* NPC chat gating: one talk per hour per NPC */
@@ -2500,12 +3037,19 @@ function talkTo(n){
     runScene(introTianScene());
     return;
   }
+  /* v0.10: D7 第一次对话时，先把好感系统讲清楚 */
+  maybeShowAffinityUnlockTutorial();
   const favor = state.npcAffinity[n.id] || 0;
+  /* v0.10: 一周目 D7 之前隐藏数字 */
+  const affDay = (state.tutorial && state.tutorial.affinityUnlockDay) || 7;
+  const reveal = (state.day >= affDay) || (META && META.finishedRuns >= 1);
   if(favor >= 40 && !state.npcBondRoute[n.id]){
     const base = npcDialog(n);
+    const bondPrompt = reveal
+      ? ("（你们之间已经不是普通同事了。好感 "+favor+"/50。）")
+      : "（你们之间已经不只是同事了。\n你不太确定那是什么——\n但你知道你比刚来时更想看到 ta。）";
     runScene([
-      {type:"say", name:n.name,
-        text:"（你们之间已经不是普通同事了。好感 "+favor+"/50。）"},
+      {type:"say", name:n.name, text:bondPrompt},
       {type:"choice", name:n.name, prompt:"你想把关系带到哪里？", options8:{
         Fi:{ text:"进入浪漫剧情（不分性别）", fn:()=>{
           inject([{type:"say", name:n.name, text:"行。\n那我们就离谱一点。\n下次一起在会议室偷写情书。"}]);
@@ -2525,7 +3069,12 @@ function talkTo(n){
   }
   const base = npcDialog(n);
   const bond = npcBondFlavor(n);
-  runScene(bond ? [{type:"say", name:n.name, text:bond}, ...base] : base);
+  /* v0.9: 阶段+好感分层前奏（intro/dev × low/mid/high）*/
+  const tier = phaseAffinityIntro(n);
+  const prelude = [];
+  if(tier) prelude.push({type:"say", name:n.name, text:tier});
+  if(bond) prelude.push({type:"say", name:n.name, text:bond});
+  runScene(prelude.length ? [...prelude, ...base] : base);
 }
 
 /* ===================== INTRO ===================== */
@@ -2577,6 +3126,89 @@ function introTianScene(){
     }},
     {type:"say", name:"系统",
       text:"你站在走廊里。\n你不太记得自己叫什么。\n你记得 9 点要打卡。\n你的本能在指挥身体往工位走。"},
+    /* v0.9: D1 强制立项启动会 — 直接接续，不让玩家有自由空隙 */
+    {type:"act", fn:()=>{
+      state.flags.day1Locked = true;
+      setTimeout(()=>runScene(kickoffDay1Scene()), 200);
+    }},
+  ];
+}
+
+/* v0.9 · DAY 1 强制立项启动会
+   叙事上锁死整天的时间进度：
+   · 09:00 → 田 把你拉去会议室
+   · 10:00 → 土狗 / 总制作人 上场天马行空
+   · 14:00 → 橙子 / 主策 坦白困境
+   · 16:00 → 团队吐槽 + 暗示主角是「多功能替补」
+   · 17:30 → 散会，22:00 自动结算
+   工位 / 电梯在该日全程被 day1Locked 挡掉。 */
+function kickoffDay1Scene(){
+  return [
+    {type:"say", name:"系统",
+      text:"——  D1 · 09:30  ·  会议室门口  ——\n田已经在门口等你了。\n他把工牌敲了敲门："},
+    {type:"say", name:"田 / 二游老兵",
+      text:"立项启动会。\n10 点。\n会议室。\n"+COMPANY_NAME+"全员到场。\n别告诉我你忘了。"},
+    {type:"act", fn:()=>{
+      /* 自动把玩家放进会议室 (M 区) */
+      try { changeRoom("meeting", 5, 5); } catch(e){}
+      state.hour = 10; state.minute = 0; updateHUD();
+    }},
+
+    /* —— 上午：土狗天马行空 —— */
+    {type:"say", name:"系统",
+      text:"——  D1 · 10:00  ·  会议室  ——\n墙上挂着「"+COMPANY_NAME+" · 立项启动会」。\n人差不多都到了。\n土狗推门进来，把咖啡杯放在桌上。"},
+    {type:"say", name:"土狗 / 总制作人",
+      text:"来，先说大方向。\n我们这一次要做一个——\n像〈空洞骑士〉一样深、\n像〈塞尔达〉一样自由、\n像某铁道一样能氪、\n还要像 vtuber 直播一样能续命的——\n\n长青二游 + 类魂动作 + 模拟经营。"},
+    {type:"say", name:"土狗 / 总制作人",
+      text:"别皱眉。\n我说的不是抄。\n我说的是——\n\n全都给我做出来。"},
+    {type:"choice", name:"* 你被点名做自我介绍", prompt:"你怎么开口？",
+      options8:{ _plain:[
+        { text:"\"我做过策划、美术、还能写点脚本。\"", fn:()=>{ inject([{type:"say", name:"土狗", text:"行。\n那你就是那个'什么都能干一点'的人。\n这次靠你。"}]); }},
+        { text:"\"我比较擅长……被 Push。\"", fn:()=>{ inject([{type:"say", name:"土狗", text:"哈。\n好。\n那我后面就放心 push 你了。"}]); }},
+        { text:"（沉默 5 秒）\"……呃，你好。\"", fn:()=>{ inject([{type:"say", name:"土狗", text:"……\n行。\n社恐我不为难你，但项目我要。"}]); }},
+      ]}},
+    {type:"say", name:"系统",
+      text:"——  D1 · 12:00  ·  午休  ——\n整个上午你都在吃土狗那一套愿景。\n你没怎么吃饭。\n你回了一下消息。"},
+    {type:"act", fn:()=>{ state.hour = 14; state.minute = 0; updateHUD(); }},
+
+    /* —— 下午：橙子坦白 —— */
+    {type:"say", name:"系统",
+      text:"——  D1 · 14:00  ·  会议室（下半场）  ——\n橙子按了一下会议笔。\n屏幕上是真实排期。"},
+    {type:"say", name:"橙子 / 主策",
+      text:"行，我说点人话。\n上面要的那一套——\n\n我们做不到。\n我们没有美术总，没有引擎组，\n数值一共两个人，QA 还在另一个项目借调。"},
+    {type:"say", name:"橙子 / 主策",
+      text:"……所以这次我才把你叫过来。\n你别问为什么是你。\n你就是那个本来不该来这个项目的人。"},
+
+    {type:"act", fn:()=>{ state.hour = 16; state.minute = 0; updateHUD(); }},
+    {type:"say", name:"米米 / 原画",
+      text:"我先吐槽一句。\n这套方向我画一套主美就要 3 个月。\n我们没 3 个月。"},
+    {type:"say", name:"哲也 / 程序",
+      text:"……\n（他没说话。\n但他低头给硬盘里另一个工程改了个备份名。）"},
+    {type:"say", name:"GZ / 管线",
+      text:"我妈下周还要复查。\n这次要是再 Crunch，我撑不住。"},
+    {type:"say", name:"Yusha / 30+ 美术",
+      text:"行了别吵了。\n我们都知道这个方向是不可能的。\n但它就是发下来了。"},
+
+    /* —— 17:00 田 + 土狗 暗示主角身份 + 风险 —— */
+    {type:"say", name:"田 / 二游老兵",
+      text:"实话告诉你。\n你上一个项目立项没过。\n你被这边拿了过来——\n是因为大家觉得你"+`"什么都能干一点"`+"。"},
+    {type:"say", name:"田 / 二游老兵",
+      text:"我知道这听起来很侮辱。\n但今天确实没人有功夫客气。"},
+    {type:"say", name:"土狗 / 总制作人",
+      text:"就这样。\n8 天后我再来一次会议室。\n立项过了我们继续。\n没过的话——"},
+    {type:"say", name:"土狗 / 总制作人",
+      text:"（他扫了一圈所有人。\n没把那句话说完。）\n\n行，你们都懂。\n散会。"},
+    {type:"act", fn:()=>{
+      /* 17:30 散会 → 自动跳到 22:00 强制结算 */
+      addKeyword("替补");
+      addKeyword("8 天倒计时");
+      recordMemory("项目失败 = 全员被裁");
+      state.hour = 22; state.minute = 0; updateHUD();
+      try { changeRoom("work_area", 5, 7); } catch(e){}
+    }},
+    {type:"say", name:"系统",
+      text:"——  D1 · 22:00  ·  你回到工位  ——\n屏幕上是空白的项目工程。\n你太累了。\n你今天什么都没"+`"做"`+"。\n但你已经记住了三件事——\n这家公司叫"+COMPANY_NAME+"、\n土狗说话很大、\n你是被借调来的，做不出来谁都跑不掉。"},
+    {type:"act", fn:()=>{ endOfDay("crashed"); }},
   ];
 }
 function inject(steps){
@@ -2594,6 +3226,19 @@ function selfPronoun(){
 }
 
 function interactDesk(){
+  /* v0.9: D1 立项启动会一直要到 17:30 才结束，期间不允许进项目 */
+  if(state.flags.day1Locked){
+    runScene([{type:"say", name:"* 工位",
+      text:"（kickoff 还没开完。\n土狗说"+`"今天先别动手"`+"。\n你今天也确实没法"+`"动手"`+"。）"}]);
+    return;
+  }
+  /* v0.9: 教学阶梯 — workUnlockedDay 之前不让真正做项目 */
+  const wuDay = state.tutorial && state.tutorial.workUnlockedDay || 2;
+  if(state.day < wuDay){
+    runScene([{type:"say", name:"* 工位",
+      text:"（系统提示：项目工作流程将在 D"+wuDay+" 正式开放。\n你今天先把 kickoff 复盘文档过一遍——别真动代码。）"}]);
+    return;
+  }
   state.computerSessionsToday++;
   const first = (state.computerSessionsToday===1 && !state.flags.deskFirstDone);
   const intro = [];
@@ -2626,6 +3271,86 @@ function interactDesk(){
     workChoiceStep(),
   );
   runScene(intro);
+}
+
+/* v0.10: D4+ 工位摸鱼 */
+const MOYU_OPTIONS = [
+  { id:"redbook", label:"刷小红书 · \"30 岁还做二游\"",
+    txt:"你点开搜索框。\n首页全是「裸辞」「转码」「润日本」。\n你看完了 12 条，关掉。",
+    j:["小红书","Vtuber"], dep:0.25, mins:30 },
+  { id:"vtuber",  label:"看 Vtuber 直播切片",
+    txt:"对面是个 [[GBC]] 的人在跳舞。\n弹幕飞过\"姐姐我可以\"。\n你笑了一下。\n你的工位邻居假装没看到。",
+    j:["Vtuber","切片","GBC"], dep:0, mins:30 },
+  { id:"taobao",  label:"在淘宝买没用的东西",
+    txt:"你下单了一个键盘清洁刷。\n你已经有 3 个了。\n但这一个的颜色不一样。",
+    j:["剁手"], dep:0, mins:20 },
+  { id:"news",    label:"刷行业八卦",
+    txt:"\"X 厂裁员 200 人。\"\n\"Y 项目暴死。\"\n\"Z 总监跑了。\"\n你看完之后心情比开始更差。",
+    j:["N+1","解散","裁员"], dep:0.4, mins:30 },
+  { id:"meme",    label:"在群里发表情包",
+    txt:"你随手保存了一张「我也想下班」。\n群里有 3 个人发了 +1。\n这是你今天的社交。",
+    j:["梗图"], dep:0, mins:15 },
+  { id:"fanfic",  label:"在 LOFTER 偷偷写同人",
+    txt:"你打开手机备忘录。\n你写了 200 字。\n你看了一眼之后又删了 100 字。",
+    j:["同人","LOFTER"], dep:0, mins:30 },
+  { id:"steam",   label:"翻 Steam 愿望单",
+    txt:"愿望单里有 47 个游戏。\n你最近一年只玩完了 1 个。\n那个还是手机端。",
+    j:["独游"], dep:0.2, mins:20 },
+  /* 关键支线：独立开发 — 给「独立游戏制作人」结局铺路 */
+  { id:"indie",   label:"× 独立开发 · 偷偷写自己的 demo",
+    txt:"你新建了一个 unity 工程。\n名字叫「未命名_v"+(Math.floor(Math.random()*9)+1)+"」。\n你写了一个 player controller。\n你只用了 40 分钟，\n但你这一周第一次觉得自己活着。",
+    j:["独游","GameJam"], dep:0, mins:60, indie:3 },
+];
+function maybeShowMoyuTutorial(){
+  if(state.tutorial.hintsShown.moyu) return;
+  state.tutorial.hintsShown.moyu = true;
+  showToast("D4 起，你的工位多了一个「摸鱼」入口。\n摸鱼里有些选项，会一直跟到结局。", "achv");
+}
+function moyuStep(){
+  /* v0.10: 累计 3 次「独立开发」摸鱼 + 至少进入 dev 阶段 = 解锁「离职做独游」隐藏选项 */
+  const indieReady = (state.flags.indieDevTimes||0) >= 3 && state.day >= 4;
+  return {
+    type:"choice", name:"* 工位 · 摸鱼", showAll8:false,
+    prompt:"你又坐回来了。\n屏幕上是项目工程，\n但你的手已经伸向浏览器。",
+    options8:{
+      _plain: [
+        ...MOYU_OPTIONS.map(o=>({
+          text:o.label, fn:()=>{
+            inject([
+              {type:"say", name:"*", text:o.txt},
+              {type:"act", fn:()=>{
+                advanceMinutes(o.mins);
+                (o.j||[]).forEach(j=>unlockJargon(j));
+                if(o.indie){
+                  state.flags.indieSpark = (state.flags.indieSpark||0) + o.indie;
+                  state.flags.indieDevTimes = (state.flags.indieDevTimes||0) + 1;
+                  if(state.flags.indieDevTimes === 1){
+                    showToast("你脑子里多了一个「自己做游戏」的想法。", "achv");
+                  }
+                  if(state.flags.indieDevTimes === 3){
+                    showToast("「独立开发」入口已就绪。\n如果你下次再来摸鱼——\n那个选项会出现。", "achv");
+                  }
+                }
+                if(o.dep) maybeEnterDepressed(o.dep);
+              }},
+            ]);
+          }
+        })),
+        ...(indieReady ? [{
+          text:"×× 提交离职信 · 走「独立游戏制作人」路线",
+          fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"你打开邮件。\n你写下\"我决定离开\"。\n你点了发送。\n\n你也不知道明天的房租怎么交。\n但今天你按下了发送键。"},
+              {type:"act", fn:()=>{ triggerEnding("indie_dev"); }},
+            ]);
+          }
+        }] : []),
+        { text:"× 还是回去做项目吧",
+          fn:()=>{ inject([workChoiceStep()]); } },
+      ],
+    },
+  };
 }
 
 /* 同事工位 — 不消耗时间，给一段感悟或八卦，偶尔解锁黑话 */
@@ -2723,6 +3448,24 @@ function interactColleagueDesk(x, y){
   }
 }
 
+/* v0.9: 是否解锁二级方向 = phase 已经达到 tutorial.directionUnlockPhase。
+   一周目默认 directionUnlockPhase = "dev"，即 D8 评审通过后才解锁；
+   NG+ 改为 "intro"，第 1 天起就能选方向。 */
+function isDirectionUnlocked(){
+  const t = state.tutorial || {};
+  if(t.directionUnlockPhase === "intro") return true;
+  return state.phase === "dev";
+}
+function pickWorkOrDirection(fn){
+  return ()=>{
+    if(isDirectionUnlocked()){
+      inject([workDirectionChoiceStep(fn)]);
+    } else {
+      /* 阶段 1：直接掷骰，方向留给"立项之后再决定" */
+      doWork(fn, null);
+    }
+  };
+}
 function workChoiceStep(){
   const extra = [];
   if(state.anxietyActive){
@@ -2742,19 +3485,29 @@ function workChoiceStep(){
       }
     });
   }
+  const dirNote = isDirectionUnlocked()
+    ? "（每一段都对应一种你性格里的功能。\n你越擅长，成功率越高。\n选完之后还要选具体方向——\n方向偏好会决定 D15 的项目类型。）"
+    : "（立项阶段（D1-D7）只能选大类。\n· 每一段都对应一种你性格里的功能。\n· 越擅长，成功率越高。\n· 二级方向（写实/卡通/服务端…）会在 D8 立项评审通过后解锁。）";
   return {
     type:"choice", name:"* 工位 · 项目 · 选择一个开发环节", showAll8:true,
-    prompt:"（每一段都对应一种你性格里的功能。\n你越擅长，成功率越高。\n但每次成长都会让对位的功能萎缩。）",
+    prompt: dirNote,
     options8:{
-      Ne:{ text: TASK_INFO.Ne.label + workHint("Ne"), fn:()=>inject([workDirectionChoiceStep("Ne")]) },
-      Ni:{ text: TASK_INFO.Ni.label + workHint("Ni"), fn:()=>inject([workDirectionChoiceStep("Ni")]) },
-      Ti:{ text: TASK_INFO.Ti.label + workHint("Ti"), fn:()=>inject([workDirectionChoiceStep("Ti")]) },
-      Fi:{ text: TASK_INFO.Fi.label + workHint("Fi"), fn:()=>inject([workDirectionChoiceStep("Fi")]) },
-      Te:{ text: TASK_INFO.Te.label + workHint("Te"), fn:()=>inject([workDirectionChoiceStep("Te")]) },
-      Si:{ text: TASK_INFO.Si.label + workHint("Si"), fn:()=>inject([workDirectionChoiceStep("Si")]) },
-      Se:{ text: TASK_INFO.Se.label + workHint("Se"), fn:()=>inject([workDirectionChoiceStep("Se")]) },
-      Fe:{ text: TASK_INFO.Fe.label + workHint("Fe"), fn:()=>inject([workDirectionChoiceStep("Fe")]) },
+      Ne:{ text: TASK_INFO.Ne.label + workHint("Ne"), fn: pickWorkOrDirection("Ne") },
+      Ni:{ text: TASK_INFO.Ni.label + workHint("Ni"), fn: pickWorkOrDirection("Ni") },
+      Ti:{ text: TASK_INFO.Ti.label + workHint("Ti"), fn: pickWorkOrDirection("Ti") },
+      Fi:{ text: TASK_INFO.Fi.label + workHint("Fi"), fn: pickWorkOrDirection("Fi") },
+      Te:{ text: TASK_INFO.Te.label + workHint("Te"), fn: pickWorkOrDirection("Te") },
+      Si:{ text: TASK_INFO.Si.label + workHint("Si"), fn: pickWorkOrDirection("Si") },
+      Se:{ text: TASK_INFO.Se.label + workHint("Se"), fn: pickWorkOrDirection("Se") },
+      Fe:{ text: TASK_INFO.Fe.label + workHint("Fe"), fn: pickWorkOrDirection("Fe") },
       _plain:[
+        ...((state.day >= 4) ? [{
+          text:"× 摸鱼 · 今天是真的不想干（多种选项）",
+          fn:()=>{
+            maybeShowMoyuTutorial();
+            inject([moyuStep()]);
+          }
+        }] : []),
         { text:"× 不做项目了 · 看一眼招聘软件就走", fn:()=>{
           const co = ["鹰甲","麦穗","百合丝","折纸","悠心","沐目","蛮啾","夜莺"];
           const c = co[Math.floor(Math.random()*co.length)];
@@ -2890,6 +3643,18 @@ function interactSleepPod(side){
       prompt: female
         ? "你站在了「另一边」。\n谁都没回头。"
         : "躺一下，时间会过得很快。", options8:{
+        /* v0.10: 任何时刻都可以直接「跳过今天」 */
+        Te:{ text:"× 直接跳过今天（拉上舱门到明早）", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你拉上舱门。\n你今天不打算再做任何事了。\n（——下一次睁眼，是明天早上。——）"},
+            {type:"act", fn:()=>{
+              /* 跳过今天 = 不算加班，但也不算"19 点前下班" */
+              state.flags["d"+state.day+"_overtimeMark"] = false;
+              endOfDay("slept");
+            }},
+          ]);
+        }},
         Si:{ text: state.hour>=18 ? "在公司过夜（结束今天）" : "钻进去睡 1.5 小时", fn:()=>{
           if(state.hour >= 18){
             inject([
@@ -3045,6 +3810,12 @@ function pickAfterworkEvent(){
 }
 
 function interactElevator(){
+  /* v0.9: D1 立项启动会期间禁用电梯（既不能弃工也不能走楼层）*/
+  if(state.flags.day1Locked){
+    runScene([{type:"say", name:"* 电梯",
+      text:"（kickoff 还没散。\n你不会现在按那个按钮的。）"}]);
+    return;
+  }
   /* v0.6: 电梯既是下班窗口，也是楼层切换 */
   const fl = currentRoom().floor;
   /* 楼层导航选项（_plain，按楼层动态生成） */
@@ -3091,17 +3862,19 @@ function interactElevator(){
     ]);
     return;
   }
-  /* 18:00 之前 = 楼层切换 + 弃岗 */
+  /* v0.10: 18:00 之前 = 楼层切换 + 早退（早退只跳过当天，不再终止周目）*/
   runScene([
     {type:"say", name:"*",
       text:"电梯厅。按钮亮着。\n现在还不到下班点。"},
     {type:"choice", name:"* 电梯", showAll8:true,
       prompt:"去哪里？", options8:{
-        Te:{ text:"× 弃工 · 直接走人，今天不干了", fn:()=>{ triggerEnding("escape_quit"); }},
-        Fi:{ text:"× \"我做不下去了\" · 弃工", fn:()=>{ triggerEnding("escape_quit"); }},
+        Te:{ text:"× 早退 · 今天不干了，明天再来",
+          fn:()=>{ endDayByLeaving("early"); }},
+        Fi:{ text:"× \"今天就让它结束吧\" · 早退",
+          fn:()=>{ endDayByLeaving("soft"); }},
         Ni:{ text:"看着按钮，知道按下去等于什么", fn:()=>{
           inject([{type:"say", name:"*",
-            text:"你看着按钮。\n按下去等于今天结束。\n不按等于今天还没结束。"}]);
+            text:"你看着按钮。\n按下去等于今天结束——\n但明天还会再来一次。"}]);
         }},
         Si:{ text:"想起每天都站在这里的自己", fn:()=>{
           inject([{type:"say", name:"*",
@@ -3138,21 +3911,84 @@ function elevatorRideTo(roomId, x, y){
 }
 function endDayByLeaving(mode){
   const lines = {
-    walk: "你下楼。\n外面是宜山路。\n地铁口的光亮着。",
-    soft: "你下楼。\n地铁还没到末班。\n你站在月台上很久。",
-    live: "你下楼，叫了打车去 livehouse。\n你这周第一次听到自己想听的东西。",
-    arcade: "你下楼去了机厅。\n鼓点把今天的会议声盖住了。\n你终于能呼吸。",
+    walk:  "你下楼。\n外面是宜山路。\n地铁口的光亮着。",
+    early: "你比下班点更早下了楼。\n外面天还没全黑。\n你呼吸了一次。",
+    soft:  "你下楼。\n地铁还没到末班。\n你站在月台上很久。",
+    live:  "你下楼，叫了打车去 livehouse。\n你这周第一次听到自己想听的东西。",
+    arcade:"你下楼去了机厅。\n鼓点把今天的会议声盖住了。\n你终于能呼吸。",
     ramen: "你下楼拐进小巷。\n一碗豚骨面咸得离谱。\n你把汤喝光了。",
-    park: "你沿着高架下面一路跑。\n跑到汗把焦虑从耳朵里冲出去一点。",
+    park:  "你沿着高架下面一路跑。\n跑到汗把焦虑从耳朵里冲出去一点。",
   };
+  /* v0.10: livehouse / arcade / ramen / park 等夜活动 → 次日全天 buff（一次性）*/
+  const BUFF_BY_MODE = {
+    live:   { name:"manic",  text:"livehouse 的余震会让你明早异常亢奋。" },
+    arcade: { name:"manic",  text:"鼓点会让你明早手指还在颤——亢奋。" },
+    ramen:  { name:"drunk",  text:"明早起来你身体会有点轻飘飘的（微醺）。" },
+    park:   { name:"hallu",  text:"夜跑后你明早可能会看到不存在的东西（幻觉）。" },
+  };
+  const buff = BUFF_BY_MODE[mode];
+  /* v0.10: 加班/早退判定 — 只看离开时刻 */
+  const leavingHour = state.hour;
+  if(leavingHour < 19){
+    /* 19:00 前下班：今日不算加班 + 直接清焦虑 */
+    state.flags["d"+state.day+"_leftBefore19"] = true;
+  }
+  if(leavingHour < 20){
+    /* 20:00 前下班：清掉本日的"加班"标记 */
+    state.flags["d"+state.day+"_overtimeMark"] = false;
+  }
   runScene([
     {type:"say", name:"系统",
       text: lines[mode] || lines.walk},
-    {type:"act", fn:()=>{ endOfDay("left"); }},
+    ...(buff ? [{type:"say", name:"系统",
+      text:"（"+buff.text+"\n这种活动一周目只能用一次，明早醒来直接进状态。）"}] : []),
+    {type:"act", fn:()=>{
+      if(buff){
+        state.flags.tomorrowBuff = buff.name;
+      }
+      endOfDay("left");
+    }},
   ]);
 }
 
 /* ========== 新交互（v0.6） ========== */
+
+/* v0.10: 茶水间 桌子 · 吃饭 — 消耗 1h + 消除一种异常状态 */
+function interactPantryTable(){
+  const meals = [
+    "你吃了一个公司订的便当。\n红烧肉是真的肉，胡萝卜是真的胡萝卜。\n没有惊喜，也没有难吃。",
+    "你点了一份 [[沙县]]。\n蒸饺 + 拌面 + 紫菜蛋花汤。\n你吃完之后觉得自己又能撑 4 个小时。",
+    "你买了一份便利店饭团。\n你坐在桌前慢慢嚼，看窗外的高架。",
+    "你在公司茶水间泡了一桶 [[螺蛳粉]]。\n隔壁同事远远地皱了眉。\n你假装没看见。",
+    "你今天什么都不想吃。\n你只是把汤喝完了。\n汤是温的。",
+  ];
+  const m = meals[Math.floor(Math.random()*meals.length)];
+  runScene([
+    {type:"say", name:"* 茶水间 · 桌子",
+      text:"你在桌前坐下。\n这里有一盏暖灯。"},
+    {type:"choice", name:"* 茶水间 · 吃饭",
+      prompt:"花 1 小时吃饭？\n（吃完会清掉你身上的 1 种异常状态。）", options8:{
+        Si:{ text:"好，慢慢吃", fn:()=>{
+          inject([
+            {type:"say", name:"*", text: m},
+            {type:"act", fn:()=>{
+              advanceMinutes(60);
+              if(state.specialState){
+                showToast("你的「"+stateLabel(state.specialState.name)+"」缓下来了。", "achv");
+                clearState();
+              } else {
+                showToast("没什么异常 — 就当好好吃了一顿。", "note");
+              }
+              recordMemory("一个人在茶水间吃完一整顿饭");
+            }},
+          ]);
+        }},
+        Te:{ text:"算了，回工位", fn:()=>{
+          inject([{type:"say", name:"*", text:"你站起来。\n便当还没拆。"}]);
+        }},
+      }},
+  ]);
+}
 
 /* 沙发 / 上网冲浪 — 消遣行为，消耗 30min，但可解锁二次元黑话 */
 function interactSofaForum(){
@@ -3280,6 +4116,19 @@ function interactToilet(){
             {type:"act", fn:()=>{ recordMemory("在卫生间躲过一次"); }},
           ]);
         }},
+        /* v0.10: 隔间 · 释放（隐晦、无性别） */
+        Se:{ text:"关上隔间门，处理一下身体", fn:()=>{
+          state.flags.toiletReliefToday = (state.flags.toiletReliefToday||0) + 1;
+          inject([
+            {type:"say", name:"*",
+              text:"你关上门。\n隔间里只有水声、自己的呼吸、和外面冲水器的回响。\n\n你把身体里某种没有名字的东西放出去了一点。\n\n（——肩膀松了一公分。\n大脑里那根弦也松了一截。——）"},
+            {type:"act", fn:()=>{
+              advanceMinutes(15);
+              recordMemory("公司厕所里那 15 分钟");
+              if(state.specialState && state.specialState.name==="manic" && Math.random()<0.5) clearState();
+            }},
+          ]);
+        }},
         Te:{ text:"算了，回工位", fn:()=>{
           inject([{type:"say", name:"*", text:"你转身。\n没人注意到你刚刚消失了一会儿。"}]);
         }},
@@ -3290,8 +4139,8 @@ function interactToilet(){
 function interactGym(){
   runScene([
     {type:"say", name:"*",
-      text:"健身房没什么人。\n跑步机在那里，灯亮着。"},
-    {type:"choice", name:"* 健身房",
+      text:"健身房在一楼。\n跑步机的红灯亮着，跳绳挂在杆上。\n空调比工区凉两度。"},
+    {type:"choice", name:"* 健身房", showAll8:true,
       prompt:"你已经一周没动过了。", options8:{
         Se:{ text:"跑 30 分钟", fn:()=>{
           inject([
@@ -3304,6 +4153,62 @@ function interactGym(){
             }},
           ]);
         }},
+        Te:{ text:"硬拉 5 组（练到极限）", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你加了一片，又加了一片。\n第 5 组的时候腰开始抖。\n你听见自己的牙齿在响。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(60);
+              boostZeroSum("Se", 5); boostZeroSum("Te", 2);
+              /* 极限训练后小概率亢奋 */
+              if(!state.specialState && Math.random()<0.35) setState("manic", 4);
+            }},
+          ]);
+        }},
+        Ne:{ text:"试试看那个泡沫轴怎么用", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你在泡沫轴上滚了 10 分钟。\n你滚得不太对——\n你滚出了一个新的痛点。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(20);
+              recordMemory("第一次知道自己腰这里也会疼");
+            }},
+          ]);
+        }},
+        Ni:{ text:"对着落地镜呆 15 分钟", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你看着镜子里的自己。\n你想 30 岁了。\n你想 5 年前你不是这个样子。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(20);
+              if(!state.specialState && Math.random()<0.30) setState("hallu", 3);
+              recordMemory("镜子里的那个人不是你以为的样子");
+            }},
+          ]);
+        }},
+        Fi:{ text:"在角落拉伸，没人看你", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你坐在垫子上，慢慢压腿。\n身体里某些紧的地方——\n开始松了一点点。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(30);
+              if(state.specialState && state.specialState.name==="depressed" && Math.random()<0.5) clearState();
+            }},
+          ]);
+        }},
+        Fe:{ text:"看 Yusha / 哲也 练，搭话", fn:()=>{
+          const here = (state.player.room === "gym");
+          inject([
+            {type:"say", name:"*",
+              text: here
+                ? "你装作只是来看看。\n练完一组，他们会跟你点头。"
+                : "其实你这会儿不在健身房。\n你在脑子里看见了他们。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(15);
+              adjustNpcAffinity("yusha", "Fe", "primary");
+            }},
+          ]);
+        }},
         Si:{ text:"在器械上坐着不动", fn:()=>{
           inject([
             {type:"say", name:"*",
@@ -3311,9 +4216,18 @@ function interactGym(){
             {type:"act", fn:()=>{ advanceMinutes(15); }},
           ]);
         }},
-        Te:{ text:"算了，没时间", fn:()=>{
-          inject([{type:"say", name:"*", text:"你转身走开。"}]);
+        Ti:{ text:"研究每台器械的力学", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你拍了照，画了图。\n你给整套力量房做了一份「使用规约 v1」。\n没人会看，但你舒服了。"},
+            {type:"act", fn:()=>{ advanceMinutes(40); boostZeroSum("Ti", 3); unlockJargon("文档驱动"); }},
+          ]);
         }},
+        _plain:[
+          { text:"× 算了，回去", fn:()=>{
+            inject([{type:"say", name:"*", text:"你转身走开。"}]);
+          }},
+        ],
       }},
   ]);
 }
@@ -3322,7 +4236,7 @@ function interactSmoke(){
   runScene([
     {type:"say", name:"*",
       text:"楼外的吸烟区是这条路上最沉默的一小块。\n你看见三个公司的人，没人说话。\n空气里全是别人的烟。"},
-    {type:"choice", name:"* 吸烟区",
+    {type:"choice", name:"* 吸烟区", showAll8:true,
       prompt:"你不抽烟。", options8:{
         Ni:{ text:"听他们抱怨", fn:()=>{
           inject([
@@ -3350,6 +4264,38 @@ function interactSmoke(){
             }},
           ]);
         }},
+        /* v0.10: 更多吸烟区活动 */
+        Si:{ text:"问那个老烟枪：「你做哪个项目？」", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"他抬头看你。\n说了一个早就解散的项目名字。\n他笑了一下，弹了弹烟。"},
+            {type:"act", fn:()=>{ unlockJargon("解散"); recordMemory("烟雾里那个项目的名字"); }},
+          ]);
+        }},
+        Se:{ text:"模仿他们的姿势站着，呼一口冷气", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你呼出去的气在冷空气里很白。\n看上去也像烟。\n那一瞬间你混进去了。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(15);
+              if(state.specialState && state.specialState.name==="manic" && Math.random()<0.4) clearState();
+            }},
+          ]);
+        }},
+        Fe:{ text:"递一盒口香糖给隔壁的人", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"对方愣了一下。\n然后接了。\n然后没说谢谢，只是点了下头。"},
+            {type:"act", fn:()=>{ recordMemory("一次没被说谢谢的善意"); }},
+          ]);
+        }},
+        Ti:{ text:"研究每家公司工牌的颜色规律", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"蓝绿色 = 二游。\n灰色 = 数据。\n胸前没工牌的 = 老板。\n\n你给自己列了个表。"},
+            {type:"act", fn:()=>{ advanceMinutes(20); unlockJargon("工牌"); }},
+          ]);
+        }},
         Te:{ text:"看一眼时间，回去", fn:()=>{
           inject([{type:"say", name:"*", text:"你转身。"}]);
         }},
@@ -3357,11 +4303,22 @@ function interactSmoke(){
   ]);
 }
 
+/* v0.10: 数飞机的回忆库 + 八维微变 */
+const PLANE_MEMORIES = [
+  { txt:"那架是去福冈的，你 22 岁第一次坐飞机也是去那。\n机舱里你哭了一次，你以为是因为分离，\n后来你发现那只是机舱减压。", fn:"Si", d:+2, side:"Ne", ds:-1 },
+  { txt:"那架是 ANA 的星空联盟。\n你脑子里立刻冒出一个 demo：\n机舱视角的 walking sim。", fn:"Ne", d:+2, side:"Si", ds:-1 },
+  { txt:"那架降下去的方向是浦东。\n你想到那个去年回深圳之后再没联系的人。", fn:"Fi", d:+2, side:"Te", ds:-1 },
+  { txt:"那架的爬升角太陡了。\n你心里默默算了一下推重比。", fn:"Ti", d:+2, side:"Fe", ds:-1 },
+  { txt:"风很大，那架被吹歪了一下又拉回来。\n你想：\n如果是我做飞行模拟，今晚的风噪音必须这么写。", fn:"Se", d:+2, side:"Ni", ds:-1 },
+  { txt:"它的灯一闪一闪。\n你想到很多年以后，\n你终于不会在这条路上数飞机的样子。", fn:"Ni", d:+2, side:"Se", ds:-1 },
+  { txt:"那架的机型你认不出来。\n你掏出手机查 Flightradar24——\n它是从福冈直飞的 ANA。\n你想起一个人。", fn:"Te", d:+1, side:"Fi", ds:-1 },
+  { txt:"它从西边飞过来，朝东南去。\n你跟着它的航向看了 3 秒，\n你也想被运到一个不在这里的地方。", fn:"Fe", d:+1, side:"Ti", ds:-1 },
+];
 function interactRailing(){
   runScene([
     {type:"say", name:"*",
       text:"楼顶的风很大。\n虹桥机场方向有飞机起飞。\n你站在栏杆前。\n下面是宜山路。"},
-    {type:"choice", name:"* 楼顶 · 栏杆",
+    {type:"choice", name:"* 楼顶 · 栏杆", showAll8:true,
       prompt:"你想到什么？", options8:{
         Ni:{ text:"想到自己 30 岁了", fn:()=>{
           inject([
@@ -3393,6 +4350,45 @@ function interactRailing(){
             {type:"say", name:"*",
               text:"……\n你退后了一步。\n你只是想看，并不真的想做。"},
             {type:"act", fn:()=>{ recordMemory("天台上退后的那一步"); }},
+          ]);
+        }},
+        /* v0.10: 数飞机 — 回忆 + 八维微变 */
+        Si:{ text:"数飞机（虹桥方向起飞的那几架）", fn:()=>{
+          state.flags.planeWatchCount = (state.flags.planeWatchCount||0) + 1;
+          const m = PLANE_MEMORIES[Math.floor(Math.random()*PLANE_MEMORIES.length)];
+          inject([
+            {type:"say", name:"*",
+              text:"你抬头开始数。\n\n"+m.txt+"\n\n（已数到 "+state.flags.planeWatchCount+" 架。）"},
+            {type:"act", fn:()=>{
+              advanceMinutes(20);
+              boostZeroSum(m.fn, m.d);
+              recordMemory("天台上数飞机的那个晚上");
+              if(state.flags.planeWatchCount === 7){
+                achv("st_plane_watcher");
+                showToast("成就：数完了第 7 架。", "achv");
+              }
+            }},
+          ]);
+        }},
+        Te:{ text:"用手机给飞机拍一张照片", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你举手机。\n那架已经飞过了。\n下一次。"},
+            {type:"act", fn:()=>{ advanceMinutes(10); }},
+          ]);
+        }},
+        Fe:{ text:"喊一句「再见」朝飞机的方向", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你小声喊了一句。\n风把它吹散了。\n但你心里有人。"},
+            {type:"act", fn:()=>{ advanceMinutes(10); recordMemory("跟一架飞机道别"); }},
+          ]);
+        }},
+        Ti:{ text:"从航线推算上海上空有几条 ATS", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你蹲在栏杆边画了一会儿。\n你结论是 8 条主航线 + 4 条备份。\n（你没法验证。）"},
+            {type:"act", fn:()=>{ advanceMinutes(30); boostZeroSum("Ti", 2); }},
           ]);
         }},
       }},
@@ -3930,10 +4926,17 @@ function npcDialog(n){
 function maybeEnterDepressed(p){
   p = (p===undefined ? 1 : p);
   if(state.specialState) return;
-  if(Math.random() < p) setState("depressed", 4);
+  /* v0.9: 引导期 D1~D3 不真正进入异常，避免一周目第三天就抑郁劝退 */
+  const abnormalReady = (state.day >= (state.tutorial && state.tutorial.abnormalUnlockDay || 4));
+  if(!abnormalReady) return;
+  /* v0.9: 整体下调 30%；同时若已经处于焦虑则再 -20% */
+  let prob = p * 0.6;
+  if(state.anxietyActive) prob *= 0.8;
+  if(Math.random() < prob) setState("depressed", 4);
 }
 function settleAnxietyAtEndOfDay(){
   const overtimeToday = !!state.flags["d"+state.day+"_overtimeMark"];
+  const leftBefore19 = !!state.flags["d"+state.day+"_leftBefore19"];
   if(overtimeToday){
     state.overtimeStreak = (state.overtimeStreak || 0) + 1;
     state.anxietyRestDays = 0;
@@ -3944,12 +4947,20 @@ function settleAnxietyAtEndOfDay(){
     return;
   }
   state.overtimeStreak = 0;
+  /* v0.10: 19 点前下班 = 第二天直接清焦虑 */
   if(state.anxietyActive){
-    state.anxietyRestDays = (state.anxietyRestDays || 0) + 1;
-    if(state.anxietyRestDays >= 2){
+    if(leftBefore19){
       state.anxietyActive = false;
       state.anxietyRestDays = 0;
       state.flags.anxietyClearedToday = true;
+    } else {
+      /* 准时但未到 19:00 前 → 仍按"两天逐步消退"逻辑 */
+      state.anxietyRestDays = (state.anxietyRestDays || 0) + 1;
+      if(state.anxietyRestDays >= 2){
+        state.anxietyActive = false;
+        state.anxietyRestDays = 0;
+        state.flags.anxietyClearedToday = true;
+      }
     }
   }
 }
@@ -3960,7 +4971,7 @@ function addKeyword(k){
   }
 }
 
-/* ===================== REVIEW ===================== */
+/* ===================== REVIEW (v0.9 双阶段) ===================== */
 function buildGreenlitGameName(){
   const focus = state.projectFocus || {};
   const winner = Object.entries(focus).sort((a,b)=>b[1]-a[1])[0]?.[0] || "design";
@@ -3973,8 +4984,19 @@ function buildGreenlitGameName(){
     experience:["sg-手感守望","kt-快打地平线"],
     coordination:["pm-群聊启示录","co-协作幻想"],
   }[winner] || ["mh-方神"];
-  return spoof[Math.floor(Math.random()*spoof.length)];
+  const base = spoof[Math.floor(Math.random()*spoof.length)];
+  /* v0.9: 把出现频次最高的二级方向标签拼成括号注释 */
+  const styleArr = state.projectStyle || [];
+  let styleTag = "";
+  if(styleArr.length){
+    const cnt = {};
+    styleArr.forEach(s=>{ cnt[s] = (cnt[s]||0)+1; });
+    const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0];
+    styleTag = "（"+top+"向）";
+  }
+  return base + styleTag;
 }
+/* DAY 8 阶段 Boss 立项评审：通过 → 进 dev；不通过 → 单一失败结局。 */
 function runReview(){
   const indie = state.flags.indieSpark || 0;
   const dep   = state.depressedTimes;
@@ -3985,66 +5007,157 @@ function runReview(){
     (topFn==="Te"||topFn==="Si"||topFn==="Fi") ? 4 :
     (topFn==="Fe"||topFn==="Ti"||topFn==="Se") ? 2 : -1;
   state.flags.reviewBonus = 0;
+  state.flags.reviewBonus1 = 0;
   scene = null;
   document.getElementById("dialogue").classList.add("show");
   runScene([
     {type:"say", name:"系统",
-     text:"——  DAY 8  ·  评  审 会 议 室  ——\n\n你被叫进会议室。\n墙上挂着「"+COMPANY_NAME+" · 评审专用」的牌子。"},
+     text:"——  DAY 8  ·  阶段 Boss · 立项评审  ——\n\n你被叫进会议室。\n墙上挂着「"+COMPANY_NAME+" · 立项评审」。\n\n这一关过了，我们才进正式开发期。\n这一关没过——\n那就没下一关。"},
     {type:"say", name:"土狗 / 总制作人",
      text:"来，开始。\n我只看两件事：\n第一，能不能活；第二，能不能火。\n别端着，直接说。"},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"来，开始。\n我只看两件事：\n第一,能不能活；第二,能不能火。\n别端着,直接说。"},
     {type:"choice", name:"土狗 / 总制作人", prompt:"第一轮：你怎么汇报当前版本？", options8:{
-      Te:{ text:"先报风险与里程碑", fn:()=>{ state.flags.reviewBonus += 3; }},
-      Ne:{ text:"先讲愿景和用户情绪", fn:()=>{ state.flags.reviewBonus += 2; }},
-      Fi:{ text:"先讲作品表达和价值", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Ti:{ text:"先讲指标算法和样本量", fn:()=>{ state.flags.reviewBonus += 2; }},
-      Si:{ text:"逐条复盘 7 天所有改动", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Fe:{ text:"先感谢各部门并背锅", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Se:{ text:"现场演示手感变化", fn:()=>{ state.flags.reviewBonus += 2; }},
-      Ni:{ text:"先讲半年后的产品路径", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Te:{ text:"先报风险与里程碑", fn:()=>{ state.flags.reviewBonus1 += 3; }},
+      Ne:{ text:"先讲愿景和用户情绪", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Fi:{ text:"先讲作品表达和价值", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Ti:{ text:"先讲指标算法和样本量", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Si:{ text:"逐条复盘 7 天所有改动", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Fe:{ text:"先感谢各部门并背锅", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Se:{ text:"现场演示手感变化", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Ni:{ text:"先讲半年后的产品路径", fn:()=>{ state.flags.reviewBonus1 += 2; }},
     }},
     {type:"say", name:"土狗 / 总制作人",
-     text:"行。\n第二轮：你要我批资源，就给我一句人话，告诉我你偏哪个方向。"},
-    {type:"choice", name:"土狗 / 总制作人", prompt:"第二轮：你申请的主方向是？", options8:{
-      Fi:{ text:"美术体验优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.art += 2; }},
-      Si:{ text:"QA 稳定优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.qa += 2; }},
-      Te:{ text:"程序性能优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.program += 2; }},
-      Ne:{ text:"新玩法试验优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.design += 2; }},
-      Ti:{ text:"系统深度优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.system += 2; }},
-      Fe:{ text:"协作效率优先", fn:()=>{ state.flags.reviewBonus += 1; state.projectFocus.coordination += 2; }},
-      Se:{ text:"手感反馈优先", fn:()=>{ state.flags.reviewBonus += 1; state.projectFocus.experience += 2; }},
-      Ni:{ text:"长线赛季优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.design += 1; }},
+     text:"行。\n第二轮——立项后我会再问你一次方向。\n现在你只用告诉我，你这 7 天里最'想'做哪一段？"},
+    {type:"choice", name:"土狗 / 总制作人", prompt:"第二轮：你最想做哪一段？", options8:{
+      /* v0.9: 阶段 Boss 不再写 projectFocus，留到 phase=dev 真实工作累积 */
+      Fi:{ text:"美术体验", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Si:{ text:"QA 稳定", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Te:{ text:"程序架构", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Ne:{ text:"新玩法试验", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Ti:{ text:"系统深度", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Fe:{ text:"团队协作", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Se:{ text:"手感反馈", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Ni:{ text:"长线赛季", fn:()=>{ state.flags.reviewBonus1 += 2; }},
     }},
     {type:"say", name:"土狗 / 总制作人",
-     text:"最后一轮。\n如果炸了，谁背锅？\n你别说「共同承担」，那是空话。"},
+     text:"最后一轮。\n如果炸了,谁背锅？\n你别说"+`"共同承担"`+",那是空话。"},
     {type:"choice", name:"* 会议室 · 最后一问", prompt:"你怎么回答？", options8:{
-      Fe:{ text:"我来背", fn:()=>{ state.flags.reviewBonus += 2; }},
-      Te:{ text:"我背项目，管理背排期", fn:()=>{ state.flags.reviewBonus += 2; }},
-      Ti:{ text:"先定义失败，再定义责任", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Fi:{ text:"我不甩锅，但我会保住团队", fn:()=>{ state.flags.reviewBonus += 2; }},
-      Ne:{ text:"如果炸了，就立刻转型", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Si:{ text:"按流程背锅，按文档复盘", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Se:{ text:"炸了就通宵修到能上", fn:()=>{ state.flags.reviewBonus += 1; }},
-      Ni:{ text:"我会提前让它不炸", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Fe:{ text:"我来背", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Te:{ text:"我背项目,管理背排期", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Ti:{ text:"先定义失败,再定义责任", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Fi:{ text:"我不甩锅,但我会保住团队", fn:()=>{ state.flags.reviewBonus1 += 2; }},
+      Ne:{ text:"如果炸了,就立刻转型", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Si:{ text:"按流程背锅,按文档复盘", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Se:{ text:"炸了就通宵修到能上", fn:()=>{ state.flags.reviewBonus1 += 1; }},
+      Ni:{ text:"我会提前让它不炸", fn:()=>{ state.flags.reviewBonus1 += 2; }},
     }},
     {type:"act", fn:()=>{
       unlockJargon("流水"); unlockJargon("首日");
       const score = Math.round(
-        grids + indie * 1.2 + jar / 6 - dep * 2 + matchScore + (state.flags.reviewBonus||0)
+        grids + indie * 1.2 + jar / 6 - dep * 2 + matchScore + (state.flags.reviewBonus1||0)
       );
       const pass = score >= 20;
-      state.flags.reviewScore = score;
-      state.flags.reviewPass = pass;
-      if(pass) state.flags.greenlitGameName = buildGreenlitGameName();
+      state.flags.phaseBossScore = score;
+      state.flags.phaseBossPass = pass;
     }},
     {type:"say", name:"系统",
      text:"投屏上是你这 7 天做出来的东西：\n\n· 项目进度  " + grids + " / 28 格\n· 解锁黑话  " + jar +
           "\n· 抑郁次数  " + dep +
           "\n· 独立火花  " + indie +
           "\n· 当前类型  " + state.mbti +
-          "\n· 评审互动加分  " + (state.flags.reviewBonus||0) +
-          "\n· 评审分数  " + state.flags.reviewScore + " / 20"},
+          "\n· 阶段 Boss 加分  " + (state.flags.reviewBonus1||0) +
+          "\n· 阶段 Boss 分数  " + state.flags.phaseBossScore + " / 20"},
+    {type:"act", fn:()=>{
+      if(state.flags.phaseBossPass){
+        runScene([
+          {type:"say", name:"土狗 / 总制作人",
+           text:"行。\n立项过了。\n那就开干吧。\n下次见你是 D15，终评。"},
+          {type:"say", name:"系统",
+           text:"——  进入第 2 阶段：开发期 D9 ~ D15  ——\n\n从今天开始：\n· 项目进度归零，开发期的进度条重新开始。\n· 工作每段都要选一个'方向'（写实/卡通/服务端/2D…）。\n· 你的方向偏好会决定 D15 终评时项目长成什么样。\n· 同事的对话也会换一套——他们终于把你当自己人了。"},
+          {type:"act", fn:()=>{
+            state.phase = "dev";
+            /* v0.10: 进入开发期，立项进度清零，重启 dev 进度条 */
+            for(const fn of FN_LIST){
+              if(state.project.phases[fn]) state.project.phases[fn].progress = 0;
+            }
+            state.project.progress = 0;
+            state.day = 9; state.hour = 9; state.minute = 0;
+            state.flags.day1Locked = false;
+            updateHUD(); draw();
+          }},
+        ]);
+      } else {
+        runScene([
+          {type:"say", name:"土狗 / 总制作人",
+           text:"……\n这版没立住。\n抱歉。\n你们各自找路吧。"},
+          {type:"act", fn:()=>{ triggerEnding("phase_boss_fail"); }},
+        ]);
+      }
+    }},
+  ]);
+}
+
+/* DAY 15 终评审 — 项目命名 + 多结局矩阵 */
+function runFinalReview(){
+  const indie = state.flags.indieSpark || 0;
+  const dep   = state.depressedTimes;
+  const jar   = state.unlockedJargon.size;
+  const grids = state.project.progress;
+  const topFn = topStack()[0];
+  const matchScore =
+    (topFn==="Te"||topFn==="Si"||topFn==="Fi") ? 4 :
+    (topFn==="Fe"||topFn==="Ti"||topFn==="Se") ? 2 : -1;
+  state.flags.reviewBonus3 = 0;
+  scene = null;
+  document.getElementById("dialogue").classList.add("show");
+  runScene([
+    {type:"say", name:"系统",
+     text:"——  DAY 15  ·  终评审 + 项目命名  ——\n\n会议室的牌子换了。\n现在写的是「"+COMPANY_NAME+" · 终评 · 项目命名」。"},
     {type:"say", name:"土狗 / 总制作人",
-     text:"行，就这样。\n会后把命名给我。\n别写太正常，正常不会被记住。"},
+     text:"D8 那次只是让你们活下来。\n这次我要看你们 7 天到底做出了什么。\n来，最后一轮——\n直接说，你们这版的'人设'是什么？"},
+    {type:"choice", name:"土狗 / 总制作人", prompt:"第一轮：项目人设？", options8:{
+      Te:{ text:"工业线长期可运营", fn:()=>{ state.flags.reviewBonus3 += 3; }},
+      Ne:{ text:"全新品类，首发即破圈", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Fi:{ text:"作者表达,宁缺毋滥", fn:()=>{ state.flags.reviewBonus3 += 1; }},
+      Ti:{ text:"系统/数值优先,可扩展", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Si:{ text:"稳,先跑长青", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Fe:{ text:"以社群驱动 + 玩家共创", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Se:{ text:"以手感和短反馈为护城河", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Ni:{ text:"赛季线 + 半年后的世界观", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+    }},
+    {type:"say", name:"橙子 / 主策",
+     text:"再问一句。\n这版命名我们要发出去——\n你想怎么写？"},
+    {type:"choice", name:"橙子 / 主策", prompt:"第二轮：命名风格？", options8:{
+      Fi:{ text:"作品感优先,可以怪一点", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Te:{ text:"四个字以内,市场好读", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+      Ne:{ text:"先开 A/B 测,让用户投票", fn:()=>{ state.flags.reviewBonus3 += 1; }},
+      Fe:{ text:"问一下社群,他们说了算", fn:()=>{ state.flags.reviewBonus3 += 1; }},
+      Si:{ text:"按行业惯例,品类 + 名词", fn:()=>{ state.flags.reviewBonus3 += 1; }},
+      Ti:{ text:"按命名公式：动词 + 主体", fn:()=>{ state.flags.reviewBonus3 += 1; }},
+      Se:{ text:"现场起,谁拍板谁负责", fn:()=>{ state.flags.reviewBonus3 += 1; }},
+      Ni:{ text:"留一个能撑 5 年的代号", fn:()=>{ state.flags.reviewBonus3 += 2; }},
+    }},
+    {type:"act", fn:()=>{
+      const score = Math.round(
+        grids + indie * 1.2 + jar / 6 - dep * 2 + matchScore +
+        (state.flags.reviewBonus1||0) + (state.flags.reviewBonus2||0) + (state.flags.reviewBonus3||0)
+      );
+      const pass = score >= 32;
+      state.flags.reviewScore = score;
+      state.flags.reviewPass = pass;
+      if(pass) state.flags.greenlitGameName = buildGreenlitGameName();
+    }},
+    {type:"say", name:"系统",
+     text:"投屏上是你这 14 天做出来的东西：\n\n· 项目进度  " + grids + " / 28 格\n· 解锁黑话  " + jar +
+          "\n· 抑郁次数  " + dep +
+          "\n· 独立火花  " + indie +
+          "\n· 当前类型  " + state.mbti +
+          "\n· 阶段 Boss 加分  " + (state.flags.reviewBonus1||0) +
+          "\n· 终评互动加分  " + (state.flags.reviewBonus3||0) +
+          "\n· 终评分数  " + state.flags.reviewScore + " / 32"},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"行,就这样。\n命名给我。\n别写太正常,正常不会被记住。"},
     {type:"act", fn:()=>{ triggerEnding(state.flags.reviewPass ? "review_pass" : "review_fail"); }},
   ]);
 }
@@ -4080,6 +5193,12 @@ function triggerEnding(reason){
     if(indie >= 4)            { achv("end_fail_indie"); endingId = "review_fail_indie"; }
     else if(dep >= 3)         { achv("end_fail_dep");   endingId = "review_fail_dep"; }
     else                      { achv("end_fail"); }
+  } else if(reason === "phase_boss_fail"){
+    achv("end_phase_boss_fail");
+    endingId = "phase_boss_fail";
+  } else if(reason === "indie_dev"){
+    achv("end_indie_dev");
+    endingId = "indie_dev";
   }
   META.endings.add(endingId);
   /* 7 天无异常 + 评审通关 */
@@ -4128,6 +5247,14 @@ function triggerEnding(reason){
     title = "·  立 项 失 败  ·";
     quote = "项目黄了。\n下周一闹钟还会响。";
     desc  = COMPANY_NAME+"说\"再打磨一版\"。\n大家都听懂了。\n但没人敢说出来。\n\n你站在工位前。\n你想起 1996 年的自己——\n那时候 CCG 频道刚开始放动画。\n那时候你也还在。";
+  } else if(reason === "phase_boss_fail"){
+    title = "·  阶 段 Boss · 立 项 没 立 住  ·";
+    quote = "立项没过。\n土狗只说了一句\"抱歉\"。";
+    desc  = "会议室散得很快。\n橙子被叫去单独谈话。\n田没回工位，直接上了顶楼。\n\n你在 D8 的傍晚收到了 [[N+1]] 的口头通知。\n下周一不用来打卡。\n\n——你这个项目没活到正式开发期。";
+  } else if(reason === "indie_dev"){
+    title = "·  独 立 游 戏 制 作 人  ·";
+    quote = "你交了离职信。\n你打开 unity，新建了一个工程。";
+    desc  = "你在 D"+state.day+" 提了离职。\n土狗看了你一眼，说\"行，你想清楚了就行\"。\n\n你把工位收拾干净，\n那个写满 BUG 的本子留在了抽屉里。\n\n半年后，你的 demo 上线了 itch.io，\n名字叫《"+(state.flags.greenlitGameName||"this road")+"》。\n它有 312 个赞，14 个差评。\n你看了一晚上。\n\n——这是你做过的第一个真的属于自己的游戏。";
   } else {
     title = "·  待 续  ·";
     quote = "你又过完了一周。\n下周还要继续。";
@@ -4147,6 +5274,7 @@ function triggerEnding(reason){
 function topFn(){ return topStack()[0]; }
 function restart(){
   state = freshState();
+  applyNgPlusTutorial(state);
   document.getElementById("ending").classList.remove("show");
   document.getElementById("title").classList.remove("hide");
   mbtiSetupOn = false; mbtiIntroOn = false;
@@ -4176,8 +5304,38 @@ function updateHUD(){
   document.getElementById("pfill").style.width = pct + "%";
   document.getElementById("ppct").innerText = state.project.progress + "/" + PROJECT_TOTAL;
   renderSidePanel();
+  renderTodaySchedule();
   /* 自动存档 (轻量, 仅在游戏真正开始后写) */
   if(state.runStarted && !state.gameOver) saveRun();
+}
+
+/* v0.9 · 常驻今日日程渲染 */
+function renderTodaySchedule(){
+  const wrap = document.getElementById("todaysched");
+  if(!wrap) return;
+  /* 标题保留 */
+  wrap.innerHTML = "<span class=\"stitle\">DAY "+state.day+" · 今日日程</span>";
+  const today = (state.schedule||[]).filter(e=>
+    e.day===state.day && (e.discovered || e.force || e.fixed)
+  ).sort((a,b)=>a.hour-b.hour);
+  if(!today.length){
+    const empty = document.createElement("span");
+    empty.className = "sempty";
+    empty.innerText = "（今天什么都没标记。）";
+    wrap.appendChild(empty);
+    return;
+  }
+  for(const e of today){
+    const past = (e.hour < state.hour) || (e.hour===state.hour && e.minute && state.minute > (e.minute||0));
+    const now  = (e.hour===state.hour);
+    const span = document.createElement("span");
+    span.className = "sentry " + e.category + (now?" now":"") + (past&&!now?" past":"");
+    span.innerHTML =
+      "<span class=\"stime\">"+String(e.hour).padStart(2,"0")+":00</span>"+
+      "<span class=\"stxt\">"+e.title+"</span>"+
+      (e.force?"<span class=\"force\">强制</span>":"");
+    wrap.appendChild(span);
+  }
 }
 
 /* ===================== SCHEDULE UI ===================== */
@@ -4192,7 +5350,8 @@ function openSchedule(){
     (byDay[e.day] = byDay[e.day]||[]).push(e);
   }
   let any = false;
-  for(let d=1; d<=5; d++){
+  const maxDay = state.totalDays || 15;
+  for(let d=1; d<=maxDay; d++){
     const items = byDay[d];
     if(!items) continue;
     any = true;
@@ -4200,13 +5359,14 @@ function openSchedule(){
     const dayBox = document.createElement("div");
     dayBox.className = "day";
     const h = document.createElement("h4");
-    h.innerText = "DAY " + d + "  ·  " + WEEK[(d-1)%7];
+    h.innerText = "DAY " + d + "  ·  " + WEEK[(d-1)%7] +
+      (d===8 ? "  ·  阶段 Boss" : "") + (d===15 ? "  ·  终评审" : "");
     dayBox.appendChild(h);
     for(const e of items){
       const row = document.createElement("div");
       row.className = "entry" + ((d===state.day && e.hour===state.hour) ? " now" : "");
       const t  = document.createElement("span"); t.className="t"; t.innerText = String(e.hour).padStart(2,"0")+":00";
-      const ti = document.createElement("span"); ti.className="ti"; ti.innerText = e.title;
+      const ti = document.createElement("span"); ti.className="ti"; ti.innerText = e.title + (e.force?"  · 强制":"");
       const cat= document.createElement("span"); cat.className="cat "+e.category;
       cat.innerText = ({work:"WORK",life:"LIFE",boss:"BOSS",dis:"???"})[e.category] || e.category;
       const so = document.createElement("span"); so.className="source"; so.innerText = "@"+e.source;
@@ -4611,6 +5771,12 @@ function drawTile(x, y, t, ox, oy){
     ctx.fillStyle = "#3a3050"; ctx.fillRect(px,py+TILE-12,TILE,2);
     ctx.fillStyle = "#11141a"; ctx.fillRect(px+4, py+TILE-10, 2, 10);
     ctx.fillStyle = "#11141a"; ctx.fillRect(px+TILE-6, py+TILE-10, 2, 10);
+  } else if(t==="k"){
+    /* v0.10: 茶水间 桌子 (kitchen) */
+    ctx.fillStyle = "#46362b"; ctx.fillRect(px+2, py+8, TILE-4, 18);
+    ctx.fillStyle = "#6b513f"; ctx.fillRect(px+2, py+8, TILE-4, 4);
+    ctx.fillStyle = "#ddd";    ctx.fillRect(px+8, py+12, 8, 6);
+    ctx.fillStyle = "#7b3f1f"; ctx.fillRect(px+18, py+12, 6, 6);
   }
 }
 
@@ -4875,7 +6041,13 @@ function leaveTitle(){
   const t = document.getElementById("title");
   if(t){ t.classList.remove("show"); t.classList.add("hide"); }
   if(!META.achievements.has("first_run")) achv("first_run");
-  showMbtiIntro();
+  /* v0.9: 一周目跳过荣格八维介绍页，直接进 MBTI 四题；
+     NG+（已完成 ≥ 1 周目）才显示这一页。 */
+  if(META.finishedRuns >= 1){
+    showMbtiIntro();
+  } else {
+    showMbtiSetup();
+  }
 }
 
 /* ===== "继续" : 加载存档, 跳过 MBTI 直接回到游戏 ===== */
@@ -4894,9 +6066,28 @@ function continueRun(){
   if(!state.projectFocus){
     state.projectFocus = { art:0, qa:0, program:0, design:0, system:0, experience:0, coordination:0 };
   }
+  /* v0.9 新字段缺省值 (兼容老存档) */
   if(state.anxietyActive === undefined) state.anxietyActive = false;
   if(state.anxietyRestDays === undefined) state.anxietyRestDays = 0;
   if(state.overtimeStreak === undefined) state.overtimeStreak = 0;
+  if(!state.totalDays || state.totalDays < 8) state.totalDays = 15;
+  if(!state.phase) state.phase = (snap.day && snap.day > 8) ? "dev" : "intro";
+  if(!state.phaseBossDay) state.phaseBossDay = 8;
+  if(!state.finalReviewDay) state.finalReviewDay = 15;
+  if(!state.tutorial){
+    state.tutorial = {
+      workUnlockedDay: 2, abnormalUnlockDay: 4,
+      affinityUnlockDay: 7, directionUnlockPhase: "dev",
+      hintsShown: {},
+    };
+  }
+  if(state.tutorial && state.tutorial.affinityUnlockDay === 5){
+    /* v0.10: 旧存档 D5 → D7 */
+    state.tutorial.affinityUnlockDay = 7;
+  }
+  if(state.tutorial && !state.tutorial.hintsShown) state.tutorial.hintsShown = {};
+  if(!state.projectStyle) state.projectStyle = [];
+  applyNgPlusTutorial(state);
   ensureNpcSocialState();
   state.runStarted     = true;
   /* 关掉所有开场层 */
