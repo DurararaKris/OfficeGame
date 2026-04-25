@@ -3860,16 +3860,30 @@ function interactElevator(){
     ]);
     return;
   }
-  /* v0.10: 18:00 之前 = 楼层切换 + 早退（早退只跳过当天，不再终止周目）*/
+  /* v0.10.1: 18:00 之前 = 楼层切换 + "早退"（只跳过当天）；
+     真正的"今天不干了 = 终止周目"放在特殊状态/焦虑下才暴露 */
+  const inTrouble = !!state.specialState || !!state.anxietyActive;
+  const earlyLeave = {
+    text:"× 早退 · 今天不干了，明天再来",
+    fn:()=>{ endDayByLeaving("early"); },
+  };
+  const quitForGood = {
+    text:"×× 不干了 · 提交辞呈，今天最后一次按这个按钮",
+    fn:()=>{
+      runScene([
+        {type:"say", name:"*",
+          text:"你按下了「-1」。\n你在脑子里把那封辞职邮件写完了。\n你不会再回来按这个按钮。"},
+        {type:"act", fn:()=>{ triggerEnding("escape_quit"); }},
+      ]);
+    },
+  };
   runScene([
     {type:"say", name:"*",
-      text:"电梯厅。按钮亮着。\n现在还不到下班点。"},
+      text: inTrouble
+        ? "电梯厅。按钮亮着。\n你身上那种'撑不住'的感觉，今天比平时更清楚一点。"
+        : "电梯厅。按钮亮着。\n现在还不到下班点。"},
     {type:"choice", name:"* 电梯", showAll8:true,
       prompt:"去哪里？", options8:{
-        Te:{ text:"× 早退 · 今天不干了，明天再来",
-          fn:()=>{ endDayByLeaving("early"); }},
-        Fi:{ text:"× \"今天就让它结束吧\" · 早退",
-          fn:()=>{ endDayByLeaving("soft"); }},
         Ni:{ text:"看着按钮，知道按下去等于什么", fn:()=>{
           inject([{type:"say", name:"*",
             text:"你看着按钮。\n按下去等于今天结束——\n但明天还会再来一次。"}]);
@@ -3878,7 +3892,11 @@ function interactElevator(){
           inject([{type:"say", name:"*",
             text:"你站在这里几百次了。\n按和不按都站过。"}]);
         }},
-        _plain: navOpts,
+        _plain: [
+          earlyLeave,
+          ...(inTrouble ? [quitForGood] : []),
+          ...navOpts,
+        ],
       }},
   ]);
 }
@@ -5006,6 +5024,15 @@ function runReview(){
     (topFn==="Fe"||topFn==="Ti"||topFn==="Se") ? 2 : -1;
   state.flags.reviewBonus = 0;
   state.flags.reviewBonus1 = 0;
+  /* v0.10.1: 强制把主角移到会议室 — 避免出现"在工位／走廊里被评审"的违和情况 */
+  if(typeof changeRoom === "function" && state.player && state.player.room !== "meeting"){
+    try { changeRoom("meeting", 5, 5); } catch(e){}
+  }
+  /* 同步把日程时间推到 D8 10:00（评审正式开场） */
+  if(state.day === state.phaseBossDay && state.hour < 10){
+    state.hour = 10; state.minute = 0;
+    if(typeof updateHUD === "function") updateHUD();
+  }
   scene = null;
   document.getElementById("dialogue").classList.add("show");
   runScene([
@@ -5013,8 +5040,6 @@ function runReview(){
      text:"——  DAY 8  ·  阶段 Boss · 立项评审  ——\n\n你被叫进会议室。\n墙上挂着「"+COMPANY_NAME+" · 立项评审」。\n\n这一关过了，我们才进正式开发期。\n这一关没过——\n那就没下一关。"},
     {type:"say", name:"土狗 / 总制作人",
      text:"来，开始。\n我只看两件事：\n第一，能不能活；第二，能不能火。\n别端着，直接说。"},
-    {type:"say", name:"土狗 / 总制作人",
-     text:"来，开始。\n我只看两件事：\n第一,能不能活；第二,能不能火。\n别端着,直接说。"},
     {type:"choice", name:"土狗 / 总制作人", prompt:"第一轮：你怎么汇报当前版本？", options8:{
       Te:{ text:"先报风险与里程碑", fn:()=>{ state.flags.reviewBonus1 += 3; }},
       Ne:{ text:"先讲愿景和用户情绪", fn:()=>{ state.flags.reviewBonus1 += 2; }},
@@ -5107,6 +5132,14 @@ function runFinalReview(){
     (topFn==="Te"||topFn==="Si"||topFn==="Fi") ? 4 :
     (topFn==="Fe"||topFn==="Ti"||topFn==="Se") ? 2 : -1;
   state.flags.reviewBonus3 = 0;
+  /* v0.10.1: 与 D8 一致，强制把主角拉到会议室 */
+  if(typeof changeRoom === "function" && state.player && state.player.room !== "meeting"){
+    try { changeRoom("meeting", 5, 5); } catch(e){}
+  }
+  if(state.day === state.finalReviewDay && state.hour < 10){
+    state.hour = 10; state.minute = 0;
+    if(typeof updateHUD === "function") updateHUD();
+  }
   scene = null;
   document.getElementById("dialogue").classList.add("show");
   runScene([
