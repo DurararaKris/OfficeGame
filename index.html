@@ -1,0 +1,5248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>OFFICE — demo v0.8.0.0.0</title>
+<style>
+  html,body{margin:0;padding:0;background:#0a070f;color:#fff;}
+  body{
+    font-family:"Courier New","Menlo","PingFang SC",monospace;
+    min-height:100vh;
+    display:flex; flex-direction:column; align-items:center;
+    padding:18px 16px 40px; box-sizing:border-box;
+    user-select:none;
+    font-size:18px;
+  }
+
+  h1.logo{
+    font-size:22px;letter-spacing:12px;margin:0 0 10px;
+    color:#fff;font-weight:normal;text-align:center;
+  }
+  h1.logo small{color:#777;letter-spacing:4px;font-size:14px;display:block;margin-top:4px;}
+
+  /* HUD */
+  #hud{
+    display:flex; justify-content:space-between; align-items:center;
+    width:960px; max-width:100%;
+    padding:12px 18px;
+    margin-bottom:8px;
+    border:2px solid #44384c;
+    border-radius:14px;
+    background:#0d0a14;
+    font-size:16px; letter-spacing:1px; color:#cfc8d8;
+    flex-wrap:wrap; gap:16px;
+    box-sizing:border-box;
+  }
+  #hud .group{display:flex;align-items:center;gap:10px;}
+  #hud .clock{
+    color:#ffe100; letter-spacing:2px;
+    font-size:17px;
+    background:#1a1326; padding:5px 12px; border-radius:8px;
+    border:1px solid #3a2c4a;
+  }
+  #hud .mbti{
+    color:#fff; background:#000;
+    border:2px solid #ffe100; border-radius:8px;
+    padding:4px 14px; letter-spacing:6px; font-weight:bold; font-size:17px;
+  }
+  #hud .state{
+    color:#ff77cc; font-size:15px; letter-spacing:3px;
+    border:1px solid #ff77cc; border-radius:8px;
+    padding:4px 12px; background:#1a0a18;
+  }
+  #hud .state.empty{ color:#3a3242; border-color:#2a2230; background:transparent; }
+  #hud .schedhint{ color:#5a5066; font-size:13px; letter-spacing:1px; }
+  #hud .label{ color:#7a7080; letter-spacing:1px; font-size:15px;}
+  #hud .dayno{
+    color:#fff; background:#1a1326; border:1px solid #44384c;
+    border-radius:8px; padding:4px 12px;
+    font-size:16px; letter-spacing:2px;
+  }
+  #hud .pbar{
+    width:180px; height:14px; background:#1a1326;
+    border:1px solid #44384c; border-radius:7px; overflow:hidden;
+    position:relative;
+  }
+  #hud .pfill{
+    height:100%; width:0%; background:linear-gradient(90deg,#ffe100,#ff77cc);
+    transition:width .35s ease;
+  }
+  #hud .ppct{
+    color:#ffe100; font-size:16px; letter-spacing:1px;
+    min-width:52px; text-align:right;
+  }
+
+  /* Stage / canvas */
+  #stage{
+    position:relative; width:960px; max-width:100%;
+    border-radius:14px; overflow:hidden;
+    border:3px solid #fff;
+    box-shadow:0 0 0 6px #1a1326, 0 8px 24px rgba(0,0,0,0.4);
+  }
+  canvas#game{
+    display:block; width:100%;
+    background:#0a0a0f;
+    image-rendering:pixelated; image-rendering:crisp-edges;
+  }
+
+  /* Dialogue */
+  #dialogue{
+    width:960px; max-width:100%; margin-top:14px;
+    min-height:160px; background:#000;
+    border:3px solid #fff; border-radius:14px;
+    box-sizing:border-box; padding:18px 24px 22px;
+    font-size:22px; line-height:1.7; letter-spacing:0.6px;
+    display:none; position:relative;
+    box-shadow:0 6px 18px rgba(0,0,0,0.4);
+  }
+  #dialogue.show{display:block;}
+  #dialogue .name{
+    color:#ffe100; font-weight:bold; font-size:18px;
+    letter-spacing:3px; margin-bottom:10px;
+  }
+  #dialogue .body{ color:#fff; min-height:78px; word-break:break-word; }
+  #dialogue .tip{
+    position:absolute; right:18px; bottom:10px; font-size:15px; color:#888;
+    animation:blink 1s infinite;
+  }
+  @keyframes blink{50%{opacity:0.3;}}
+
+  .redact{
+    background:#fff; color:#fff;
+    padding:0 1px; letter-spacing:0;
+    box-shadow:inset 0 0 0 1px #000;
+    user-select:none;
+    border-radius:2px;
+  }
+  .redact.unlocked{ background:transparent; color:#ffe100; box-shadow:none;}
+  .glitch{
+    animation:jit .25s infinite;
+    text-shadow:1px 0 0 #ff00aa,-1px 0 0 #00e5ff;
+    color:#ff77cc !important;
+  }
+  @keyframes jit{
+    0%{transform:translate(0,0)} 25%{transform:translate(1px,-1px)}
+    50%{transform:translate(-1px,1px)} 75%{transform:translate(1px,1px)}
+  }
+
+  /* Choices */
+  #choices{
+    display:none; width:960px; max-width:100%;
+    background:#000;
+    border:3px solid #fff; border-top:none;
+    border-radius:0 0 14px 14px;
+    margin-top:-3px;
+    box-sizing:border-box; padding:10px 24px 18px;
+    font-size:19px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.4);
+  }
+  #choices.show{display:block;}
+  #choices .opt{
+    padding:8px 0 8px 36px; position:relative; letter-spacing:0.5px; line-height:1.55;
+    cursor:pointer; border-radius:6px;
+  }
+  #choices .opt.sel{color:#ffe100;}
+  #choices .opt.sel::before{
+    content:"♥"; position:absolute; left:8px; top:8px;
+    color:#ff2e4c; font-size:20px; animation:beat .8s infinite;
+  }
+  #choices .opt.locked{color:#555;font-style:italic;}
+  #choices .opt .ftag{
+    color:#666; font-size:14px; letter-spacing:2px;
+    margin-right:10px; display:inline-block; min-width:32px; text-align:center;
+    border:1px solid #333; border-radius:5px; padding:1px 6px;
+  }
+  #choices .opt.sel .ftag{color:#ffaa00; border-color:#ffaa00;}
+  #choices .opt.shadow .ftag{color:#a060ff; border-color:#5a3a8a;}
+  #choices .opt.shadow.sel .ftag{color:#ff77cc; border-color:#ff77cc;}
+  #choices .group-label{
+    color:#666; font-size:14px; letter-spacing:3px;
+    margin:10px 0 6px;
+    border-top:1px dashed #333; padding-top:8px;
+  }
+  @keyframes beat{0%,100%{transform:scale(1)} 50%{transform:scale(1.2)}}
+
+  #helptext{
+    width:960px; max-width:100%;
+    color:#5a5066; font-size:15px; letter-spacing:1px;
+    margin-top:14px; text-align:center; line-height:1.8;
+  }
+  #helptext kbd{
+    color:#aaa; border:1px solid #333; padding:2px 8px;
+    font-size:14px; border-radius:4px;
+    background:#0d0a14;
+  }
+
+  /* ===== BOOT SEQUENCE (90s DOS 风格 · 不带 CRT 扫描线) ===== */
+  #bootSeq{
+    position:fixed; inset:0; background:#000;
+    z-index:110;
+    display:flex; flex-direction:column; justify-content:center; align-items:flex-start;
+    padding:10vh 12vw;
+    color:#7ef07e;
+    font-family:"Courier New","Menlo",monospace;
+    font-size:20px; line-height:1.9; letter-spacing:1px;
+    cursor:pointer;
+  }
+  #bootSeq.hide{display:none;}
+  #bootSeq .line{ opacity:0; transform:translateY(2px); transition:opacity .18s, transform .18s; }
+  #bootSeq .line.show{ opacity:1; transform:translateY(0); }
+  #bootSeq .line.dim{ color:#3a8a3a; }
+  #bootSeq .ok{ color:#7ef07e; }
+  #bootSeq .fail{ color:#ff5a5a; }
+  #bootSeq .warn{ color:#ffe100; }
+  #bootSeq .cur{
+    display:inline-block; width:12px; margin-left:2px;
+    background:#7ef07e; height:22px; vertical-align:-4px;
+    animation:curblink .9s steps(1) infinite;
+  }
+  #bootSeq .press{
+    margin-top:28px; color:#ffe100;
+    letter-spacing:3px; opacity:0;
+    animation:blink 1.1s infinite;
+  }
+  #bootSeq .press.show{ opacity:1; }
+  @keyframes curblink{ 50%{opacity:0;} }
+  /* 一丝 90s 的柔光——不是 CRT 扫描线，只是噪点一样的微闪 */
+  #bootSeq::after{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse at center, rgba(120,255,120,0.03), rgba(0,0,0,0.28));
+    animation:bootflicker 3.4s ease-in-out infinite;
+  }
+  @keyframes bootflicker{ 0%,100%{opacity:1;} 50%{opacity:.93;} }
+
+  /* 大按钮 (用于开场页面，鼠标点击后备方案) */
+  .bigbtn{
+    margin-top:24px; padding:14px 28px;
+    font-size:18px; letter-spacing:2px;
+    background:#1f1830; color:#fff8c2; border:2px solid #ffd166;
+    border-radius:14px; cursor:pointer;
+    font-family:inherit;
+  }
+  .bigbtn:hover{ background:#2a2240; }
+  .bigbtn:active{ transform:translateY(1px); }
+
+  /* Title */
+  #title{
+    position:fixed; inset:0; background:#000;
+    z-index:100;
+    display:none; flex-direction:column; justify-content:center; align-items:center;
+    color:#fff; text-align:center; padding:24px;
+  }
+  #title.show{display:flex;}
+  #title.hide{display:none;}
+  #title h2{
+    font-size:48px; letter-spacing:28px; color:#ffe100;
+    font-weight:normal; margin:0 0 10px;
+    text-shadow:2px 2px 0 #ff2e4c, 4px 4px 0 #a060ff;
+  }
+  #title .sub{color:#cfc8d8; letter-spacing:8px; font-size:18px; margin-top:6px;}
+  #title .desc{
+    color:#8a8294; font-size:18px; letter-spacing:1px;
+    max-width:720px; margin:42px 20px; line-height:2;
+  }
+  #title .press{
+    margin-top:14px; color:#ffe100; letter-spacing:6px; font-size:22px;
+    animation:blink 1.1s infinite;
+  }
+  #title .tiny{
+    color:#555; font-size:14px; letter-spacing:3px; margin-top:60px;
+  }
+  #title .pokeH{
+    display:inline-block;
+    animation:pokeH 2.4s ease-in-out infinite;
+  }
+  @keyframes pokeH{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+
+  /* ===== 标题页菜单 (v0.7.0.0.5) ===== */
+  #title .menu{
+    margin-top:14px; display:flex; flex-direction:column; gap:12px;
+    align-items:center;
+  }
+  #title .menu .menubtn{
+    min-width:280px; padding:12px 22px;
+    font-size:18px; letter-spacing:6px;
+    background:#1f1830; color:#fff8c2; border:2px solid #ffd166;
+    border-radius:12px; cursor:pointer;
+    font-family:inherit;
+  }
+  #title .menu .menubtn:hover{ background:#2a2240; }
+  #title .menu .menubtn.dim{
+    color:#7a7286; border-color:#3a324a; background:#0d0a14; cursor:not-allowed;
+  }
+  #title .menu .menubtn.sel{
+    background:#3a2a55; color:#ffe100; border-color:#ffe100;
+  }
+  #title .runtag{
+    margin-top:20px; color:#a060ff; font-size:14px; letter-spacing:6px;
+  }
+
+  /* ===== 通用全屏覆盖层 (字典/成就) ===== */
+  .overlayPanel{
+    position:fixed; inset:0; background:rgba(0,0,0,0.97);
+    z-index:140; display:none;
+    padding:40px 6vw; box-sizing:border-box;
+    overflow:auto; color:#fff; font-family:inherit;
+  }
+  .overlayPanel.show{ display:block; }
+  .overlayPanel h3{
+    color:#ffe100; font-size:22px; letter-spacing:10px;
+    text-align:center; font-weight:normal; margin:0 0 6px;
+  }
+  .overlayPanel .sub{
+    color:#888; font-size:14px; letter-spacing:6px;
+    text-align:center; margin-bottom:24px;
+  }
+  .overlayPanel .closehint{
+    margin-top:32px; color:#666; font-size:14px; letter-spacing:3px;
+    text-align:center;
+  }
+  .overlayPanel .closehint kbd{
+    color:#bbb; border:1px solid #555;
+    padding:2px 10px; border-radius:4px; margin:0 4px;
+  }
+
+  /* ===== 黑话字典 ===== */
+  #dictView .dictGrid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:14px; max-width:1200px; margin:0 auto;
+  }
+  #dictView .dItem{
+    background:#100a18; border:1px solid #2a223a; border-radius:10px;
+    padding:14px 16px;
+  }
+  #dictView .dItem.locked{ background:#080510; border-color:#1f1a2c; }
+  #dictView .dItem .word{
+    color:#ffe100; font-size:17px; letter-spacing:2px;
+    font-weight:bold; margin-bottom:6px;
+  }
+  #dictView .dItem.locked .word{ color:#444; letter-spacing:6px; }
+  #dictView .dItem .def{
+    color:#bfb6cf; font-size:14px; line-height:1.7; letter-spacing:1px;
+  }
+  #dictView .dItem.locked .def{ color:#3a324a; }
+  #dictView .stats{
+    text-align:center; color:#7bd0ff; font-size:14px; letter-spacing:3px;
+    margin-bottom:18px;
+  }
+
+  /* ===== 成就 ===== */
+  #achvView .aGrid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+    gap:14px; max-width:1200px; margin:0 auto;
+  }
+  #achvView .aItem{
+    background:#100a18; border:1px solid #2a223a; border-radius:10px;
+    padding:14px 18px;
+  }
+  #achvView .aItem.unlocked{ border-color:#ffd166; background:#1a140a; }
+  #achvView .aItem.locked{ opacity:0.55; }
+  #achvView .aItem .name{
+    font-size:18px; letter-spacing:6px;
+    color:#ffd166; margin-bottom:6px; font-weight:bold;
+  }
+  #achvView .aItem.locked .name{ color:#5a5066; letter-spacing:8px; }
+  #achvView .aItem .desc{
+    color:#cfc8d8; font-size:14px; line-height:1.7;
+  }
+  #achvView .aItem.locked .desc{ color:#3a324a; }
+  #achvView .stats{
+    text-align:center; color:#7bd0ff; font-size:14px; letter-spacing:3px;
+    margin-bottom:18px;
+  }
+
+  /* 成就解锁 toast */
+  .toastItem.achv{ border-color:#ffd166; color:#ffd166; }
+
+  /* 锁住的对话选项: 灰 + 不能选 + 划掉感 */
+  #choices .opt.jlocked{
+    color:#3a324a; cursor:not-allowed;
+  }
+  #choices .opt.jlocked .ftag{
+    color:#3a324a; border-color:#2a223a;
+  }
+  #choices .opt.jlocked::after{
+    content:" · 你听不懂"; color:#5a3a8a; font-size:13px; letter-spacing:3px;
+  }
+
+  /* ===== MBTI 前置说明（荣格 8 维简介） ===== */
+  #mbtiIntro{
+    position:fixed; inset:0; background:#000;
+    z-index:98;
+    display:none; flex-direction:column; justify-content:center; align-items:center;
+    color:#fff; text-align:center; padding:5vh 8vw;
+    cursor:pointer;
+  }
+  #mbtiIntro.show{ display:flex; }
+  #mbtiIntro h3{
+    color:#ffe100; font-size:22px; letter-spacing:10px;
+    font-weight:normal; margin:0 0 22px;
+  }
+  #mbtiIntro .body{
+    color:#dfd8e8; font-size:19px; letter-spacing:1px;
+    line-height:2.0; max-width:780px; white-space:pre-wrap;
+  }
+  #mbtiIntro .grid{
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:10px 18px;
+    margin:26px 0 8px; max-width:780px; color:#ffe100;
+    font-size:15px; letter-spacing:2px;
+  }
+  #mbtiIntro .grid .fn{
+    border:1px solid #5a3a8a; border-radius:8px;
+    padding:8px 6px;
+    background:#120a1a;
+  }
+  #mbtiIntro .grid .fn b{ display:block; color:#ffe100; font-size:18px; letter-spacing:3px; }
+  #mbtiIntro .grid .fn span{ display:block; color:#9a8aae; font-size:13px; margin-top:4px; }
+  #mbtiIntro .press{
+    margin-top:34px; color:#ffe100; letter-spacing:6px; font-size:18px;
+    animation:blink 1.1s infinite;
+  }
+
+  /* MBTI Setup */
+  #mbtiSetup{
+    position:fixed; inset:0; background:#000;
+    z-index:99;
+    display:none; flex-direction:column; justify-content:center; align-items:center;
+    color:#fff; text-align:center; padding:24px;
+  }
+  #mbtiSetup.show{display:flex;}
+  #mbtiSetup h3{
+    color:#ffe100; font-size:20px; letter-spacing:8px;
+    font-weight:normal; margin:0 0 18px;
+  }
+  #mbtiSetup .qno{ color:#888; font-size:15px; letter-spacing:4px; }
+  #mbtiSetup .question{
+    color:#fff; font-size:24px; letter-spacing:2px;
+    margin:24px 20px 8px; max-width:760px; line-height:1.8;
+  }
+  #mbtiSetup .desc{
+    color:#888; font-size:16px;
+    max-width:680px; margin:0 20px 32px; letter-spacing:1px; line-height:1.8;
+  }
+  #mbtiSetup .opts{display:flex; gap:28px; flex-wrap:wrap; justify-content:center;}
+  #mbtiSetup .opts .o{
+    width:340px; min-height:180px;
+    background:#000; border:2px solid #fff; color:#fff;
+    border-radius:16px;
+    padding:22px 22px 22px; cursor:pointer;
+    font-family:inherit; font-size:18px; letter-spacing:1px;
+    text-align:left; line-height:1.8;
+    transition:transform .12s, border-color .12s;
+  }
+  #mbtiSetup .opts .o.sel{ border-color:#ffe100; color:#ffe100; }
+  #mbtiSetup .opts .o b{
+    font-size:34px; letter-spacing:8px; color:#ffe100;
+    display:block; margin-bottom:12px;
+  }
+  #mbtiSetup .opts .o.sel b{ color:#fff; }
+  #mbtiSetup .opts .o:hover{border-color:#ffe100; transform:translateY(-2px);}
+  #mbtiSetup .footer{
+    margin-top:32px; color:#888; font-size:15px; letter-spacing:3px;
+  }
+  #mbtiSetup .footer kbd{color:#bbb; border:1px solid #555; padding:2px 10px; border-radius:4px;}
+  #mbtiSetup .progress{ display:flex; gap:10px; margin-top:22px;}
+  #mbtiSetup .progress span{ width:28px; height:6px; background:#333; border-radius:3px;}
+  #mbtiSetup .progress span.done{background:#ffe100;}
+
+  /* Schedule */
+  #scheduleUI{
+    position:fixed; inset:0; background:rgba(0,0,0,0.96);
+    z-index:80; display:none; padding:30px 20px; box-sizing:border-box;
+    overflow:auto;
+  }
+  #scheduleUI.show{display:block;}
+  #scheduleUI .wrap{ max-width:760px; margin:0 auto; color:#fff;}
+  #scheduleUI h3{
+    color:#ffe100; letter-spacing:10px; font-weight:normal;
+    margin:0 0 10px; font-size:22px; text-align:center;
+  }
+  #scheduleUI .sub{
+    color:#888; font-size:15px; letter-spacing:3px;
+    margin-bottom:24px; text-align:center;
+  }
+  #scheduleUI .day{
+    border:2px solid #fff; padding:14px 18px; margin-bottom:16px;
+    background:#0a070f;
+    border-radius:14px;
+  }
+  #scheduleUI .day h4{
+    color:#ffe100; letter-spacing:6px; font-weight:normal;
+    margin:0 0 10px; font-size:17px;
+  }
+  #scheduleUI .entry{
+    display:flex; gap:16px; padding:9px 0;
+    border-bottom:1px dashed #2a2230;
+    font-size:17px; line-height:1.55;
+  }
+  #scheduleUI .entry:last-child{border-bottom:none;}
+  #scheduleUI .entry .t{
+    color:#ffe100; min-width:76px; letter-spacing:1px; font-weight:bold;
+  }
+  #scheduleUI .entry .ti{ color:#fff; flex:1;}
+  #scheduleUI .entry .cat{
+    font-size:13px; letter-spacing:2px; color:#000;
+    background:#fff; padding:2px 10px; align-self:center; border-radius:5px;
+  }
+  #scheduleUI .entry .cat.work{background:#ff9f00;}
+  #scheduleUI .entry .cat.life{background:#5ad2ff;color:#000;}
+  #scheduleUI .entry .cat.boss{background:#ff3355;color:#fff;}
+  #scheduleUI .entry .cat.dis {background:#a060ff;color:#fff;}
+  #scheduleUI .entry .source{color:#5a5066; font-size:14px; letter-spacing:1px; align-self:center;}
+  #scheduleUI .entry.now{background:#1f1a08; border-radius:6px; padding-left:8px;}
+  #scheduleUI .closehint{
+    text-align:center; color:#888; font-size:15px; letter-spacing:3px; margin-top:22px;
+  }
+  #scheduleUI .closehint kbd{color:#bbb; border:1px solid #555; padding:2px 10px; border-radius:4px;}
+  #scheduleUI .empty{color:#666; font-size:16px; text-align:center; padding:40px 0;}
+
+  /* Day end */
+  #daySummary{
+    position:fixed; inset:0; background:#000;
+    display:none; z-index:90;
+    flex-direction:column; justify-content:center; align-items:center;
+    color:#fff; text-align:center; padding:30px;
+  }
+  #daySummary.show{display:flex;}
+  #daySummary .panel{
+    border:2px solid #44384c;
+    border-radius:18px;
+    background:#0a070f;
+    padding:30px 50px;
+    max-width:600px;
+  }
+  #daySummary h3{
+    color:#ffe100; letter-spacing:10px; font-weight:normal; font-size:22px; margin:0 0 20px;
+  }
+  #daySummary .line{ color:#cfc8d8; font-size:18px; line-height:2; letter-spacing:2px; white-space:pre-wrap;}
+  #daySummary .mb{
+    color:#fff; border:2px solid #ffe100;
+    border-radius:12px;
+    letter-spacing:12px;
+    font-size:38px; padding:10px 28px; margin:28px auto 0;
+    display:inline-block;
+  }
+  #daySummary .delta{
+    color:#ff77cc; font-size:15px; letter-spacing:2px;
+    margin-top:14px; white-space:pre-wrap;
+  }
+  #daySummary .press{
+    margin-top:40px; color:#ffe100; letter-spacing:6px; font-size:17px;
+    animation:blink 1.1s infinite;
+  }
+
+  /* Ending */
+  #ending{
+    position:fixed; inset:0; background:rgba(0,0,0,0.97);
+    display:none; z-index:101; color:#fff;
+    flex-direction:column; justify-content:center; align-items:center;
+    padding:48px; text-align:center; letter-spacing:2px;
+  }
+  #ending.show{display:flex;}
+  #ending h3{font-size:17px; letter-spacing:12px; color:#888; font-weight:normal; margin-bottom:16px;}
+  #ending .quote{color:#ffe100; font-size:32px; line-height:1.7; max-width:820px;}
+  #ending .desc{color:#cfc8d8; margin-top:26px; max-width:820px; line-height:1.9; font-size:19px; letter-spacing:1px;}
+  #ending .stats{
+    color:#777; margin-top:28px; font-size:15px; letter-spacing:3px; line-height:1.9;
+    border:1px solid #444; border-radius:8px; padding:10px 20px;
+  }
+  #ending button{
+    margin-top:44px; padding:14px 40px;
+    background:transparent; border:2px solid #fff; border-radius:10px;
+    color:#fff; cursor:pointer;
+    font-family:inherit; font-size:19px; letter-spacing:6px;
+  }
+  #ending button:hover{background:#ffe100; color:#000;}
+
+  /* Toast queue (纵向队列 · 逐条入场 · 长淡出) */
+  #toastStack{
+    position:fixed; left:50%; bottom:30px; transform:translateX(-50%);
+    display:flex; flex-direction:column-reverse; gap:12px;
+    pointer-events:none; z-index:200; align-items:center;
+    max-height:60vh; overflow:visible;
+  }
+  .toastItem{
+    background:#1a1326; border:2px solid #44384c; border-radius:10px;
+    padding:11px 24px; color:#cfc8d8; font-size:17px; letter-spacing:1px;
+    opacity:0; transform:translateY(10px);
+    transition:opacity .55s ease-out, transform .55s ease-out;
+    white-space:nowrap;
+    box-shadow:0 4px 18px rgba(0,0,0,0.55);
+  }
+  .toastItem.show{opacity:1; transform:translateY(0);}
+  .toastItem.fadeout{
+    opacity:0; transform:translateY(-12px);
+    transition:opacity 1.2s ease-in, transform 1.2s ease-in;
+  }
+  .toastItem.jargon{ border-color:#ffe100; color:#ffe100; }
+  .toastItem.sched { border-color:#7bd0ff; color:#7bd0ff; }
+  .toastItem.note  { border-color:#ff77cc; color:#ffaedd; }
+
+  /* Door confirm overlay */
+  #doorOverlay{
+    position:fixed; inset:0;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.55); z-index:170;
+  }
+  #doorOverlay.show{ display:flex; }
+  #doorOverlay .panel{
+    background:#1a1326; border:2px solid #ffe100; border-radius:14px;
+    color:#fff; font-size:22px; padding:28px 44px; text-align:center;
+    line-height:1.6; min-width:360px; white-space:pre-line;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+
+  /* Map view */
+  #mapView{
+    position:fixed; inset:0;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(8,4,16,0.92); z-index:180; color:#fff;
+  }
+  #mapView.show{ display:flex; }
+  #mapView .wrap{
+    background:#0e0a18; border:2px solid #ffe100; border-radius:18px;
+    padding:28px 40px; min-width:640px; max-width:92vw;
+  }
+  #mapView h3{ margin:0 0 10px; color:#ffe100; letter-spacing:8px; text-align:center; font-size:20px; }
+  #mapView .sub{ font-size:14px; color:#7a708a; text-align:center; margin-bottom:18px; letter-spacing:2px; }
+  #mapContent{ font-family:monospace; font-size:16px; line-height:1.7; color:#cfc8d8; white-space:pre; }
+  #mapContent .here{ color:#ffe100; font-weight:bold; }
+  #mapView .legend{ text-align:center; color:#7a708a; font-size:13px; letter-spacing:2px; margin-top:12px; }
+
+  /* Side project panel (28-grid) */
+  #sidePanel{
+    position:fixed; right:20px; top:110px;
+    background:#0e0a18; border:2px solid #44384c; border-radius:14px;
+    padding:16px 14px; color:#fff; width:156px;
+    text-align:center; font-family:monospace;
+    box-shadow:0 6px 16px rgba(0,0,0,.4);
+    z-index:50;
+  }
+  #sidePanel .title{
+    color:#ffe100; letter-spacing:5px; font-size:15px; margin-bottom:12px;
+  }
+  #gridStack{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:4px 8px;
+    margin-bottom:14px;
+  }
+  .gcell{
+    height:18px; background:#1a1326; border:1px solid #44384c; border-radius:4px;
+    transition: background .25s;
+  }
+  .gcell.fill{ background:linear-gradient(90deg,#ffe100,#ff77cc); border-color:#ffe100; }
+  #sidePanel .info{ color:#cfc8d8; font-size:16px; letter-spacing:1px; }
+  #sidePanel .info .hint{ color:#7a708a; font-size:13px; letter-spacing:2px; margin-top:6px; }
+
+  /* 屏幕太小的时候自动收起侧面板（720p 可显示） */
+  @media (max-width: 1240px){
+    #sidePanel{ position:static; margin:12px auto 0; width:640px; max-width:96%;}
+    #gridStack{ grid-template-columns:repeat(14, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<h1 class="logo">OFFICE<small>独角兽网络 · 某 城 · 2026 · demo v0.8.0.0.0</small></h1>
+
+<div id="hud">
+  <div class="group">
+    <span class="dayno" id="dayno">DAY 1/7</span>
+    <span class="clock" id="clock">MON · 09:00</span>
+    <span class="schedhint">[Tab] 日程</span>
+  </div>
+  <div class="group">
+    <span class="label">项目</span>
+    <div class="pbar"><div class="pfill" id="pfill"></div></div>
+    <span class="ppct" id="ppct">0%</span>
+  </div>
+  <div class="group">
+    <span class="label">类型</span>
+    <span class="mbti" id="mbtitxt">XXXX</span>
+    <span class="state empty" id="statetxt">—</span>
+  </div>
+</div>
+
+<div id="stage">
+  <canvas id="game" width="640" height="448"></canvas>
+</div>
+
+<div id="dialogue">
+  <div class="name" id="dName">—</div>
+  <div class="body" id="dBody"></div>
+  <div class="tip" id="dTip">▼ Z</div>
+</div>
+
+<div id="choices"></div>
+
+<div id="helptext">
+  移动 <kbd>↑↓←→</kbd> / <kbd>WASD</kbd>（按住连走）&nbsp;·&nbsp;
+  交互/继续 <kbd>Z</kbd> <kbd>Enter</kbd> &nbsp;·&nbsp;
+  日程 <kbd>Tab</kbd> &nbsp;·&nbsp;
+  跳过/取消 <kbd>X</kbd> <kbd>Esc</kbd>
+</div>
+
+<!-- Boot sequence (90s DOS 风, 不带 CRT 扫描线) -->
+<div id="bootSeq">
+  <div class="line dim" data-line="0">OFFICE.SYS · v0.8.0.0.0 · build 2026.04</div>
+  <div class="line" data-line="1">&gt; BIOS check ................................. <span class="ok">[ OK ]</span></div>
+  <div class="line" data-line="2">&gt; Loading sprites .............................. <span class="ok">[ OK ]</span></div>
+  <div class="line" data-line="3">&gt; Loading schedule ............................. <span class="ok">[ OK ]</span></div>
+  <div class="line" data-line="4">&gt; Loading project.dat .......................... <span class="warn">[ HOLD ]</span></div>
+  <div class="line" data-line="5">&gt; Loading memory.0001 .......................... <span class="fail">[ FAIL ]</span></div>
+  <div class="line" data-line="6">&gt; Loading memory.0002 .......................... <span class="fail">[ FAIL ]</span></div>
+  <div class="line" data-line="7">&gt; Loading identity ............................. <span class="fail">[ FAIL ]</span></div>
+  <div class="line dim" data-line="8">&nbsp;</div>
+  <div class="line" data-line="9">&gt; Reconstructing self from fragments ........... <span class="warn">[ .. ]</span></div>
+  <div class="line dim" data-line="10">&nbsp; &nbsp;fragments found: 0&nbsp; remaining: ??</div>
+  <div class="line dim" data-line="11">&nbsp;</div>
+  <div class="line" data-line="12">&gt; READY<span class="cur"></span></div>
+  <div class="press" id="bootPress">PRESS &nbsp;ANY&nbsp;KEY&nbsp; / 点 击 屏 幕 &nbsp; 进 入 今 天</div>
+</div>
+
+<!-- Title (Boot 完成后才 .show) -->
+<div id="title">
+  <h2><span class="pokeH">O</span> F F I C E</h2>
+  <div class="sub">独角兽网络 · 某 城 · 2026</div>
+  <div class="desc">
+    手机上有 187 条未读 IM。<br>
+    工位上有一个还没立项的项目。<br>
+    评审在 7 天后。
+  </div>
+  <div class="menu" id="titleMenu">
+    <button class="menubtn" id="btnContinue" data-act="continue">继 &nbsp; 续 &nbsp; 周 &nbsp; 目</button>
+    <button class="menubtn" id="btnNew"      data-act="new">开 &nbsp; 新 &nbsp; 周 &nbsp; 目</button>
+    <button class="menubtn" id="btnDict"     data-act="dict">黑 &nbsp; 话 &nbsp; 字 &nbsp; 典</button>
+    <button class="menubtn" id="btnAchv"     data-act="achv">成 &nbsp; 就 &nbsp; 列 &nbsp; 表</button>
+  </div>
+  <div class="runtag" id="runTag">·  第  1  周  目  ·</div>
+  <div class="tiny">↑↓ 选择 &nbsp;·&nbsp; Z / Enter / 点击 确认 &nbsp;·&nbsp; 一个关于七天、两种自己、很多未完成的 demo 的故事。</div>
+</div>
+
+<!-- 黑话字典 (跨周目持久化) -->
+<div id="dictView" class="overlayPanel">
+  <h3>·  黑  话  字  典  ·</h3>
+  <div class="sub">在过去的周目里听过的话，会留下来</div>
+  <div class="stats" id="dictStats">— / —</div>
+  <div class="dictGrid" id="dictGrid"></div>
+  <div class="closehint">按 <kbd>X</kbd> / <kbd>Esc</kbd> 关 闭</div>
+</div>
+
+<!-- 成就 -->
+<div id="achvView" class="overlayPanel">
+  <h3>·  成  就  列  表  ·</h3>
+  <div class="sub">每个 4 字成就对应一种结局或一种异常</div>
+  <div class="stats" id="achvStats">— / —</div>
+  <div class="aGrid" id="achvGrid"></div>
+  <div class="closehint">按 <kbd>X</kbd> / <kbd>Esc</kbd> 关 闭</div>
+</div>
+
+<!-- MBTI Intro (Jungian 8 功能简介) -->
+<div id="mbtiIntro">
+  <h3>·  关  于  TA  的  内  心  ·</h3>
+  <div class="body">这个游戏用 8 种"心理功能"（荣格八维）来记录主角的内心变化。<br>
+它们此消彼长——<b>一项成长，就意味着另一项萎缩。</b><br><br>
+你看见的只是 MBTI 四个字母；<br><br>
+（这更像真实生活——<br>你只大概知道自己是什么人。<br>具体为什么，不一定能说清。）</div>
+  <div class="grid">
+    <div class="fn"><b>Ne</b><span>外向直觉 · 可能性</span></div>
+    <div class="fn"><b>Ni</b><span>内向直觉 · 远景</span></div>
+    <div class="fn"><b>Se</b><span>外向感觉 · 此刻</span></div>
+    <div class="fn"><b>Si</b><span>内向感觉 · 细节</span></div>
+    <div class="fn"><b>Te</b><span>外向思维 · 执行</span></div>
+    <div class="fn"><b>Ti</b><span>内向思维 · 逻辑</span></div>
+    <div class="fn"><b>Fe</b><span>外向情感 · 关系</span></div>
+    <div class="fn"><b>Fi</b><span>内向情感 · 价值</span></div>
+  </div>
+  <button id="introNextBtn" class="bigbtn">按 Z / Enter · 或点这里 · 给 TA 选 一 种 类 型</button>
+</div>
+
+<!-- MBTI Setup -->
+<div id="mbtiSetup">
+  <h3>给 你 的 角 色 设 一 种 类 型</h3>
+  <div class="qno" id="qno">问题 1 / 4</div>
+  <div class="question" id="qText">—</div>
+  <div class="desc" id="qDesc">—</div>
+  <div class="opts" id="qOpts"></div>
+  <div class="progress" id="progress"></div>
+  <div class="footer">←  → 切换 &nbsp;·&nbsp; <kbd>Z</kbd> 确认</div>
+</div>
+
+<!-- Schedule -->
+<div id="scheduleUI">
+  <div class="wrap">
+    <h3>·  我  的  日  程  ·</h3>
+    <div class="sub">work · life · ???</div>
+    <div id="schedList"></div>
+    <div class="closehint">按 <kbd>Tab</kbd> / <kbd>X</kbd> / <kbd>Esc</kbd> 关 闭</div>
+  </div>
+</div>
+
+<!-- Day end -->
+<div id="daySummary">
+  <div class="panel">
+    <h3>·  这  一  天  结  束  ·</h3>
+    <div class="line" id="dsLines">—</div>
+    <div class="mb" id="dsMbti">—</div>
+    <div class="delta" id="dsDelta">—</div>
+    <div class="press">按 <b>Z</b> 继 续</div>
+  </div>
+</div>
+
+<!-- Ending -->
+<div id="ending">
+  <h3>E N D</h3>
+  <div class="quote" id="endQuote">—</div>
+  <div class="desc" id="endDesc">—</div>
+  <div class="stats" id="endStats">—</div>
+  <button onclick="restart()">* 重 新 开 始</button>
+</div>
+
+<!-- Toast queue -->
+<div id="toastStack"></div>
+
+<!-- Door confirm -->
+<div id="doorOverlay">
+  <div class="panel" id="doorPrompt">—</div>
+</div>
+
+<!-- Map view (M key) -->
+<div id="mapView">
+  <div class="wrap">
+    <h3>·  办  公  楼  地  图  ·</h3>
+    <div class="sub">按 <kbd>M</kbd> / <kbd>X</kbd> / <kbd>Esc</kbd> 关闭</div>
+    <div id="mapContent"></div>
+    <div class="legend">★ = 你现在的位置</div>
+  </div>
+</div>
+
+<!-- Side panel: 28-grid project bar -->
+<div id="sidePanel">
+  <div class="title">PROJECT</div>
+  <div id="gridStack"></div>
+  <div class="info">
+    <div><span id="gridNow">0</span> / <span id="gridTotal">28</span></div>
+    <div class="hint">立 项 评 审 · 第 8 天</div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   OFFICE  demo v0.8.0.0.0
+   ---------------------------------------------------------
+   设定：
+   - 主角生于 1996 前后，2026 年 30 出头。
+   - 长发，性别模糊。曾经爱看动画，向往独立游戏。
+   - 在独角兽网络当社畜（舞台原型借用了某条 IT 走廊，
+     但已做模糊化处理，不是对某个实际片区的致敬）。
+   - 醒来发现自己在男睡眠仓。轻度失忆。
+   ---------------------------------------------------------
+   核心系统（v0.7.0.0.5 新增）：
+   - localStorage 存档 + 跨周目元数据 (META):
+       * 当前进度自动存; 标题菜单可"继续"
+       * 已解锁黑话跨周目持久; 后续周目不用从 0 学
+       * 已得成就 / 通关数 / 已触发结局 持久
+   - 多周目: 每次结局后周目数 +1; 标题显示"第 N 周目"
+   - 18 个成就, 每个 4 字中文名(贴合语境)
+   - 黑话字典(标题菜单可查), 未解锁的条目显示 ███
+   - 黑话锁选项: 选项文本里如果有未解锁黑话, 选项变灰不可选
+     (与原有 locked 机制并存; 选中会提示"你听不懂这话")
+   - 历版功能(v0.7.0.0.4):
+   - 90s 怀旧 Boot 序列 → 标题 → 荣格八维说明 → MBTI 四题 → 剧情
+   - 三重保险输入: window keydown(capture) + body 强制 focus
+   - 修复 'function top()' 与 window.top 冲突 bug
+   - 全局字号放大，适配 720p 浏览器全屏
+   - 多房间地图（13 个房间，2 层楼 + 楼顶 + 室外）
+   - 走到门口确认切换 / M 键打开整楼地图
+   - 隐藏的 MBTI / 荣格 8 维数值（此消彼长）
+   - 黑话遮蔽 ███ → 解锁明文（v0.6 起：工作行为不解锁，仅消遣/闲聊解锁）
+   - 28 格项目进度（侧边面板）+ 大成功 / 失误（异常状态）
+   - 7 天 + 第 8 天立项评审
+   - 日程系统 (Tab)
+   - 平滑像素移动
+   - 工作事件消耗 30min ~ 4h；闲聊不消耗
+   - NPC 同一小时只能聊一次
+   - 特殊状态：抑郁 / 亢奋 / 幻觉 / 醉酒
+   - 没有压力值。所有压抑感都通过状态/记忆/视觉表达。
+   ---------------------------------------------------------
+   献给所有"做着自己不想做的游戏"的人。
+========================================================= */
+
+/* ===================== MAP (v0.6 多房间) ===================== */
+const TILE = 32;
+const COMPANY_NAME = "独角兽网络";
+/*
+  字符表：
+  # 墙        . 地板        + 门 (按 room.doors 查目的地)
+  F 你的工位     D 同事工位      M 会议桌
+  S ♂睡眠仓    Q ♀睡眠仓       T 马桶
+  C 咖啡机     P 打印机        B 留言板
+  m 镜子        w 窗户         E 电梯
+  R 前台桌      g 跑步机        X 烟灰缸
+  r 天台栏杆    L 沙发(论坛/上网)  N 公告板
+  小写字母 = 装饰（椅子等，不可走）
+*/
+
+/* 同事工位拥有人 — 配合 work_area 的 D 位置 */
+const DESK_OWNERS = {
+  "5,1": { id:"lin",   name:"小林 / 策划",  status:"active",
+    blurb:"小林的工位上贴着一张「35 岁前退休」便利贴。\n屏幕里是一个 [[白盒]] 房间。" },
+  "8,1": { id:"zheye", name:"哲也 / 程序",  status:"active",
+    blurb:"哲也工位上有一个不开机的 Switch。\n键盘是客制化，左下角磨得发亮。" },
+  "2,4": { id:"yusha", name:"Yusha / 资深美术", status:"active",
+    blurb:"Yusha 的桌面贴满了过去七八年项目的小卡。\n最旧的一张写着\"GameJam 2018\"。" },
+  "5,4": { id:"_quit", name:"（已离职）",     status:"quit",
+    blurb:"这个工位已经空了。\n显示器还在，蒙了一层薄灰。\n抽屉里有一张去年的工牌。\n名字被人刻意撕掉了。" },
+  "8,4": { id:"_fired",name:"（已被辞退）",   status:"fired",
+    blurb:"这个工位的椅子被人正反面坐过。\n屏幕被搬走了。\n桌面上还有一张便签：\n「下个项目就好了。 —— GZ」\n字迹已经褪色。" },
+};
+
+const ROOMS = {
+  work_area: {
+    name:"工区", floor:2, w:12, h:10,
+    grid:[
+      "############",
+      "#.F..D..D..#",
+      "#.f..d..d..#",
+      "#..........#",
+      "#.D..D..D..#",
+      "#.d..d..d..#",
+      "#..........#",
+      "#..........#",
+      "#.B........+",
+      "############",
+    ],
+    doors:[
+      { x:11, y:8, to:"corridor_2f", toX:1,  toY:3, label:"出去到 走廊" },
+    ],
+  },
+  corridor_2f: {
+    name:"走廊", floor:2, w:14, h:7,
+    grid:[
+      "##+##+##+#####",
+      "#............#",
+      "+............+",
+      "#............#",
+      "#............#",
+      "##+#+#####+###",
+      "##############",
+    ],
+    doors:[
+      { x:2,  y:0, to:"meeting",     toX:5, toY:5, label:"前往 会议室" },
+      { x:5,  y:0, to:"pantry",      toX:5, toY:4, label:"前往 茶水间" },
+      { x:8,  y:0, to:"print_room",  toX:5, toY:4, label:"前往 打印室" },
+      { x:0,  y:2, to:"work_area",   toX:10, toY:8, label:"返回 工区" },
+      { x:13, y:2, to:"elevator_2f", toX:1,  toY:3, label:"前往 电梯厅" },
+      { x:2,  y:5, to:"male_pod",    toX:1, toY:2, label:"进入 ♂ 睡眠仓" },
+      { x:4,  y:5, to:"female_pod",  toX:1, toY:2, label:"进入 ♀ 睡眠仓" },
+      { x:10, y:5, to:"restroom_2f", toX:3, toY:1, label:"前往 卫生间" },
+    ],
+  },
+  meeting: {
+    name:"会议室", floor:2, w:11, h:7,
+    grid:[
+      "###########",
+      "#.........#",
+      "#..MMMMM..#",
+      "#..MMMMM..#",
+      "#.........#",
+      "#####+#####",
+      "###########",
+    ],
+    doors:[ { x:5, y:5, to:"corridor_2f", toX:2, toY:1, label:"返回 走廊" } ],
+  },
+  pantry: {
+    name:"茶水间", floor:2, w:11, h:6,
+    grid:[
+      "###########",
+      "#.CC.....B#",
+      "#........L#",
+      "#.........#",
+      "#####+#####",
+      "###########",
+    ],
+    doors:[ { x:5, y:4, to:"corridor_2f", toX:5, toY:1, label:"返回 走廊" } ],
+  },
+  print_room: {
+    name:"打印室", floor:2, w:11, h:6,
+    grid:[
+      "###########",
+      "#.P......B#",
+      "#.........#",
+      "#.........#",
+      "#####+#####",
+      "###########",
+    ],
+    doors:[ { x:5, y:4, to:"corridor_2f", toX:8, toY:1, label:"返回 走廊" } ],
+  },
+  male_pod: {
+    name:"♂ 睡眠仓", floor:2, w:11, h:7,
+    grid:[
+      "###########",
+      "#S.S.S.S.S#",
+      "#.........#",
+      "#.........#",
+      "#.........#",
+      "#####+#####",
+      "###########",
+    ],
+    doors:[ { x:5, y:5, to:"corridor_2f", toX:2, toY:4, label:"返回 走廊" } ],
+  },
+  female_pod: {
+    name:"♀ 睡眠仓", floor:2, w:11, h:7,
+    grid:[
+      "###########",
+      "#Q.Q.Q.Q.Q#",
+      "#.........#",
+      "#.........#",
+      "#.........#",
+      "#####+#####",
+      "###########",
+    ],
+    doors:[ { x:5, y:5, to:"corridor_2f", toX:4, toY:4, label:"返回 走廊" } ],
+  },
+  restroom_2f: {
+    name:"卫生间", floor:2, w:9, h:6,
+    grid:[
+      "#########",
+      "#.m...T.#",
+      "#.......#",
+      "#.......#",
+      "###+#####",
+      "#########",
+    ],
+    doors:[ { x:3, y:4, to:"corridor_2f", toX:10, toY:4, label:"返回 走廊" } ],
+  },
+  elevator_2f: {
+    name:"电梯厅 · 二楼", floor:2, w:9, h:7,
+    grid:[
+      "#########",
+      "#m.....w#",
+      "#.......#",
+      "+...EE..#",
+      "#.......#",
+      "#.......#",
+      "#########",
+    ],
+    doors:[ { x:0, y:3, to:"corridor_2f", toX:12, toY:2, label:"返回 走廊" } ],
+  },
+  lobby: {
+    name:"前台 · 一楼", floor:1, w:14, h:8,
+    grid:[
+      "##############",
+      "#R..........N#",
+      "#............#",
+      "#............#",
+      "+...EE......+",
+      "#............#",
+      "#......+.....#",
+      "##############",
+    ],
+    doors:[
+      { x:0,  y:4, to:"smoking", toX:8, toY:4, label:"前往 楼外吸烟区" },
+      { x:13, y:4, to:"gym",     toX:1, toY:3, label:"前往 健身房" },
+      { x:7,  y:6, to:"smoking", toX:8, toY:4, label:"前往 楼外吸烟区" },
+    ],
+  },
+  gym: {
+    name:"健身房 · 一楼", floor:1, w:11, h:6,
+    grid:[
+      "###########",
+      "#g.g.g....#",
+      "#.........#",
+      "#........w#",
+      "+.........#",
+      "###########",
+    ],
+    doors:[ { x:0, y:4, to:"lobby", toX:12, toY:4, label:"返回 大堂" } ],
+  },
+  smoking: {
+    name:"楼外吸烟区", floor:0, w:11, h:6,
+    grid:[
+      "...........",
+      "...X...X...",
+      "...........",
+      "...........",
+      "....+......",
+      "###########",
+    ],
+    doors:[ { x:4, y:4, to:"lobby", toX:7, toY:5, label:"返回 大堂" } ],
+  },
+  rooftop: {
+    name:"楼顶天台", floor:9, w:14, h:8,
+    grid:[
+      "rrrrrrrrrrrrrr",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "..............",
+      "......+.......",
+      "##############",
+    ],
+    doors:[ { x:6, y:6, to:"elevator_2f", toX:5, toY:3, label:"返回 电梯厅" } ],
+  },
+};
+
+function currentRoom(){ return ROOMS[state.player.room]; }
+function tileAt(room, x, y){
+  const r = (typeof room === "string") ? ROOMS[room] : room;
+  if(!r || x<0 || y<0 || y>=r.h || x>=r.w) return "#";
+  return r.grid[y][x];
+}
+function isBlocked(x, y){
+  const t = tileAt(currentRoom(), x, y);
+  /* 可走：地板 . 和 门 + */
+  return !(t==="." || t==="+");
+}
+function isWalkableTile(t){ return t==="." || t==="+"; }
+function doorAt(roomId, x, y){
+  const r = ROOMS[roomId];
+  if(!r || !r.doors) return null;
+  return r.doors.find(d => d.x===x && d.y===y) || null;
+}
+function regionName(){ return currentRoom() ? currentRoom().name : ""; }
+function roomOffset(){
+  const r = currentRoom();
+  return {
+    ox: Math.floor((cvs.width  - r.w*TILE) / 2),
+    oy: Math.floor((cvs.height - r.h*TILE) / 2),
+  };
+}
+
+/* ===================== JUNG / MBTI ===================== */
+const FN_LIST = ["Ni","Ne","Si","Se","Ti","Te","Fi","Fe"];
+const STACKS = {
+  INTJ:["Ni","Te","Fi","Se","Ne","Ti","Fe","Si"],
+  INTP:["Ti","Ne","Si","Fe","Te","Ni","Se","Fi"],
+  INFJ:["Ni","Fe","Ti","Se","Ne","Fi","Te","Si"],
+  INFP:["Fi","Ne","Si","Te","Fe","Ni","Se","Ti"],
+  ISTJ:["Si","Te","Fi","Ne","Se","Ti","Fe","Ni"],
+  ISTP:["Ti","Se","Ni","Fe","Te","Si","Ne","Fi"],
+  ISFJ:["Si","Fe","Ti","Ne","Se","Fi","Te","Ni"],
+  ISFP:["Fi","Se","Ni","Te","Fe","Si","Ne","Ti"],
+  ENTJ:["Te","Ni","Se","Fi","Ti","Ne","Si","Fe"],
+  ENTP:["Ne","Ti","Fe","Si","Ni","Te","Fi","Se"],
+  ENFJ:["Fe","Ni","Se","Ti","Fi","Ne","Si","Te"],
+  ENFP:["Ne","Fi","Te","Si","Ni","Fe","Ti","Se"],
+  ESTJ:["Te","Si","Ne","Fi","Ti","Se","Ni","Fe"],
+  ESTP:["Se","Ti","Fe","Ni","Si","Te","Fi","Ne"],
+  ESFJ:["Fe","Si","Ne","Ti","Fi","Se","Ni","Te"],
+  ESFP:["Se","Fi","Te","Ni","Si","Fe","Ti","Ne"],
+};
+const INIT_VALUES = [80, 60, 45, 25, 38, 30, 20, 12];
+
+function initFromMBTI(mbti){
+  const f = {}; FN_LIST.forEach(k => f[k]=0);
+  const stk = STACKS[mbti];
+  if(!stk){ FN_LIST.forEach(k=>f[k]=40); return f; }
+  stk.forEach((fn,i)=> f[fn] = INIT_VALUES[i]);
+  return f;
+}
+function computeMBTI(f){
+  const Es = f.Ne + f.Se + f.Te + f.Fe;
+  const Is = f.Ni + f.Si + f.Ti + f.Fi;
+  const Ns = f.Ni + f.Ne;
+  const Ss = f.Si + f.Se;
+  const Ts = f.Ti + f.Te;
+  const Fs = f.Fi + f.Fe;
+  const Js = f.Te + f.Fe;
+  const Ps = f.Ne + f.Se;
+  return (Es>=Is?"E":"I")+(Ns>=Ss?"N":"S")+(Ts>=Fs?"T":"F")+(Js>=Ps?"J":"P");
+}
+function topStack(){
+  return Object.entries(state.functions).sort((a,b)=>b[1]-a[1]).map(e=>e[0]);
+}
+/* 零和：每次提升一个功能，对位功能下降一半 */
+const FN_PAIRS = {
+  Ne:"Si", Si:"Ne",
+  Ni:"Se", Se:"Ni",
+  Te:"Fi", Fi:"Te",
+  Ti:"Fe", Fe:"Ti",
+};
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function boostZeroSum(fn, delta){
+  if(!(fn in state.functions)) return;
+  const oldV = state.functions[fn];
+  state.functions[fn] = clamp(oldV + delta, 0, 160);
+  const realDelta = state.functions[fn] - oldV;
+  state.dailyFnDelta[fn] = (state.dailyFnDelta[fn]||0) + realDelta;
+  const opp = FN_PAIRS[fn];
+  if(opp){
+    const oldO = state.functions[opp];
+    const oppDelta = -realDelta * 0.5;
+    state.functions[opp] = clamp(oldO + oppDelta, 0, 160);
+    const realOpp = state.functions[opp] - oldO;
+    state.dailyFnDelta[opp] = (state.dailyFnDelta[opp]||0) + realOpp;
+  }
+}
+
+/* ===================== WORK PIPELINE ===================== */
+const PROJECT_TOTAL = 28; /* 进度条 28 格 */
+const PHASE_INFO = {
+  Ne:{ name:"立项策划",   max:4 },
+  Ni:{ name:"系统设计",   max:4 },
+  Ti:{ name:"数值平衡",   max:4 },
+  Fi:{ name:"美术风格",   max:4 },
+  Te:{ name:"程序实现",   max:4 },
+  Si:{ name:"QA / 配表",  max:4 },
+  Se:{ name:"玩法体验",   max:4 },
+  Fe:{ name:"跨部门沟通", max:4 },
+};
+const TASK_INFO = {
+  Ne:{ label:"立项策划 · 写一段灵感", time:60,
+    success:"你写下一段灵感文档。\n你重新感觉到\"想做点什么\"是什么意思。",
+    fail:"你盯着白文档。\n打了开头，又删了。\n打了一段，又删了。" },
+  Ni:{ label:"系统设计 · 画长期蓝图", time:120,
+    success:"你画了一张系统蓝图。\n第一次，你觉得这个项目有点像「一个游戏」。",
+    fail:"你画了一张图。\n回头看，没人会照着它做。" },
+  Ti:{ label:"数值平衡 · 拆系统配表", time:90,
+    success:"你拆了一个反复出现的逻辑。\n配表更干净了一点。",
+    fail:"你拆了半天，最后改回原样。\n你不太信自己刚才的判断。" },
+  Fi:{ label:"美术风格 · 调一组颜色", time:60,
+    success:"你调出一组颜色。\n它有你的味道。",
+    fail:"你调了一上午。\n看上去像谁都不像你。" },
+  Te:{ label:"程序实现 · 写一个功能", time:120,
+    success:"你写完了一个 [[feature]]。\n它跑起来了。\n你忘了这种感觉。",
+    fail:"你写完了一个 feature。\n它崩了。\n你回滚了。" },
+  Si:{ label:"QA / 配表 · 复现 bug", time:60,
+    success:"你复现了那个 bug。\n你按公司规范填了 ticket。",
+    fail:"你试了一下午也没复现。\n你怀疑那个 bug 是真的存在过。" },
+  Se:{ label:"玩法体验 · 调一会儿手感", time:60,
+    success:"你打了一会儿白盒。\n手感不一样了。\n你听见自己说\"对，就是这样\"。",
+    fail:"你打了一会儿。\n你不太确定刚才那一下是好还是不好。" },
+  Fe:{ label:"跨部门沟通 · 拉群对齐", time:90,
+    success:"你拉了一个群。\n所有人都在。\n大家居然达成了共识。",
+    fail:"你拉了一个群。\n几个人没回。\n几个人在群里吵起来了。" },
+};
+const WORK_DIRECTIONS = {
+  Ne:["核心概念","世界观","商业化定位"],
+  Ni:["主循环","赛季路线图","长线留存"],
+  Ti:["战斗数值","经济系统","成长曲线"],
+  Fi:["写实","卡通","2D 手绘"],
+  Te:["客户端","服务端","工具链"],
+  Si:["冒烟测试","兼容性回归","配置巡检"],
+  Se:["打击感","镜头反馈","关卡节奏"],
+  Fe:["和美术对齐","和程序对齐","和 QA 对齐"],
+};
+const WORK_FOCUS_MAP = {
+  Ne:"design", Ni:"design", Ti:"system", Fi:"art",
+  Te:"program", Si:"qa", Se:"experience", Fe:"coordination",
+};
+
+function addPhaseProgress(fn, amt){
+  const ph = state.project.phases[fn];
+  if(!ph) return 0;
+  const newP = clamp(ph.progress + amt, 0, ph.max);
+  const delta = newP - ph.progress;
+  ph.progress = newP;
+  /* 总进度 = 各 phase 之和，封顶 PROJECT_TOTAL */
+  state.project.progress = clamp(state.project.progress + delta, 0, PROJECT_TOTAL);
+  updateHUD();
+  return delta;
+}
+
+/* 工作判定：
+   返回 { kind, fn, rate }
+   kind: "crit"   = 大成功 (+3~5 grid, 异常状态成功 30%)
+         "ok"     = 普通成功 (+1~2 grid)
+         "fail"   = 普通失败 (0 grid)
+         "blunder"= 失误     (-2~3 grid, 异常状态失败 25%) */
+function rollWork(chosenFn){
+  let realFn = chosenFn;
+  if(state.specialState && state.specialState.name==="hallu"){
+    realFn = FN_LIST[Math.floor(Math.random()*8)];
+  }
+  const value = state.functions[realFn] || 0;
+  let rate = 0.30 + (value / 160) * 0.55;
+  const sName = state.specialState && state.specialState.name;
+  if(sName==="depressed") rate -= 0.15;
+  if(sName==="manic"){
+    if(["Te","Se","Ne","Fe"].includes(realFn)) rate += 0.10;
+    else rate -= 0.10;
+  }
+  if(sName==="drunk") rate += (Math.random()-0.5) * 0.4;
+  if(state.hour >= 18) rate -= 0.05;
+  rate = clamp(rate, 0.05, 0.95);
+
+  const ok = Math.random() < rate;
+  /* 异常状态触发大成功 / 失误 */
+  if(sName){
+    const critP = sName==="manic" ? 0.30 : sName==="drunk" ? 0.25 : sName==="depressed" ? 0.15 : 0.20;
+    const blunderP = sName==="manic" ? 0.20 : sName==="drunk" ? 0.25 : sName==="depressed" ? 0.10 : 0.15;
+    if(ok && Math.random() < critP)  return { kind:"crit",    fn:realFn, rate };
+    if(!ok && Math.random() < blunderP) return { kind:"blunder", fn:realFn, rate };
+  }
+  return { kind: ok ? "ok" : "fail", fn:realFn, rate };
+}
+
+function doWork(chosenFn, direction){
+  const info = TASK_INFO[chosenFn];
+  if(!info) return;
+  const r = rollWork(chosenFn);
+  const time = info.time + (state.specialState && state.specialState.name==="manic" ? 30 : 0);
+  let gridDelta, fnDelta, kindLabel, kindGlyph;
+  if(r.kind==="crit"){
+    gridDelta = 3 + Math.floor(Math.random()*3);  /* 3-5 */
+    fnDelta = 10;
+    kindLabel = "★大成功"; kindGlyph = "★";
+  } else if(r.kind==="ok"){
+    gridDelta = 1 + Math.floor(Math.random()*2);  /* 1-2 */
+    fnDelta = 6;
+    kindLabel = "● 成功"; kindGlyph = "●";
+  } else if(r.kind==="blunder"){
+    gridDelta = -(2 + Math.floor(Math.random()*2)); /* -2~-3 */
+    fnDelta = -8;
+    kindLabel = "× 失误"; kindGlyph = "×";
+  } else {
+    gridDelta = 0;
+    fnDelta = -3;
+    kindLabel = "○ 失败"; kindGlyph = "○";
+  }
+  const realFn = r.fn;
+  const delta = addPhaseProgress(realFn, gridDelta);
+  boostZeroSum(realFn, fnDelta);
+
+  const tag = (realFn !== chosenFn) ?
+    "（你以为你在做 "+chosenFn+"。\n但你最后做出来的，是 "+realFn+"。）\n\n" : "";
+  const phaseName = PHASE_INFO[realFn].name;
+  const dirTag = direction ? " · 方向「"+direction+"」" : "";
+  const sign = delta >= 0 ? "+" : "";
+  const flavor = (r.kind==="crit")
+      ? info.success + "\n\n你也不知道自己怎么做到的。"
+    : (r.kind==="ok")
+      ? info.success
+    : (r.kind==="blunder")
+      ? info.fail + "\n\n你把昨天的工作也搭进去了。"
+    : info.fail;
+  const msg = tag + kindLabel + " ·  " + phaseName + dirTag + "  ·  " + sign + delta + " 格\n\n" + flavor;
+
+  inject([
+    {type:"say", name:"* 工位", text: msg},
+    {type:"act", fn:()=>{
+      const focus = WORK_FOCUS_MAP[chosenFn];
+      if(focus) state.projectFocus[focus] = (state.projectFocus[focus]||0) + 1;
+      advanceMinutes(time);
+      if(r.kind==="fail" && !state.specialState && Math.random() < 0.15) maybeEnterDepressed(1);
+      if(r.kind==="blunder" && !state.specialState && Math.random() < 0.25) maybeEnterDepressed(1);
+    }},
+  ]);
+}
+
+/* ===================== META · 跨周目存档 (v0.7.0.0.5) ===================== */
+/* localStorage 键名。bump 这里的版本号 = 重置全部存档。 */
+const META_KEY = "office.meta.v1";
+const RUN_KEY  = "office.run.v1";
+
+function loadMeta(){
+  try{
+    const raw = localStorage.getItem(META_KEY);
+    if(!raw) return defaultMeta();
+    const o = JSON.parse(raw);
+    return {
+      dictUnlocked: new Set(o.dictUnlocked || []),
+      achievements: new Set(o.achievements || []),
+      endings:      new Set(o.endings      || []),
+      runs:         o.runs || 0,
+      finishedRuns: o.finishedRuns || 0,
+    };
+  } catch(e){
+    return defaultMeta();
+  }
+}
+function defaultMeta(){
+  return {
+    dictUnlocked: new Set(),
+    achievements: new Set(),
+    endings:      new Set(),
+    runs:         0,
+    finishedRuns: 0,
+  };
+}
+function saveMeta(){
+  try{
+    localStorage.setItem(META_KEY, JSON.stringify({
+      dictUnlocked: [...META.dictUnlocked],
+      achievements: [...META.achievements],
+      endings:      [...META.endings],
+      runs:         META.runs,
+      finishedRuns: META.finishedRuns,
+    }));
+  } catch(e){ console.warn("saveMeta failed", e); }
+}
+let META = loadMeta();
+
+function hasRunSave(){
+  try { return !!localStorage.getItem(RUN_KEY); } catch(e){ return false; }
+}
+function saveRun(){
+  if(!state || state.gameOver) return;
+  try{
+    /* Set / NPCS 等不可序列化的部分需要展开 */
+    const snap = {
+      v: 1,
+      day:state.day, hour:state.hour, minute:state.minute,
+      totalDays:state.totalDays,
+      mbti:state.mbti, functions:state.functions,
+      keywords:state.keywords, flags:state.flags,
+      npcLastHour:state.npcLastHour,
+      computerSessionsToday:state.computerSessionsToday,
+      coffeeToday:state.coffeeToday, sleepPodToday:state.sleepPodToday,
+      overtimeCount:state.overtimeCount,
+      overtimeStreak:state.overtimeStreak,
+      depressedTimes:state.depressedTimes,
+      anxietyActive:state.anxietyActive,
+      anxietyRestDays:state.anxietyRestDays,
+      glitchLevel:state.glitchLevel,
+      gameOver:state.gameOver,
+      introDone:state.introDone,
+      amnesia:state.amnesia,
+      memoryFragments:state.memoryFragments,
+      dailyFnDelta:state.dailyFnDelta,
+      unlockedJargon:[...state.unlockedJargon],
+      schedule:state.schedule,
+      specialState:state.specialState,
+      project:state.project,
+      canEndDay:state.canEndDay,
+      player:state.player,
+      pendingDoor:state.pendingDoor,
+      npcOverride:state.npcOverride,
+      talkingNpcId:state.talkingNpcId,
+      npcAffinity:state.npcAffinity,
+      npcBondRoute:state.npcBondRoute,
+      elevatorAfterworkUsed:state.elevatorAfterworkUsed,
+      projectFocus:state.projectFocus,
+      abnormalsHit:[...(state.abnormalsHit||[])],
+    };
+    localStorage.setItem(RUN_KEY, JSON.stringify(snap));
+  } catch(e){ console.warn("saveRun failed", e); }
+}
+function loadRun(){
+  try{
+    const raw = localStorage.getItem(RUN_KEY);
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    /* 还原 Set */
+    o.unlockedJargon = new Set(o.unlockedJargon || []);
+    o.abnormalsHit   = new Set(o.abnormalsHit || []);
+    return o;
+  } catch(e){ return null; }
+}
+function clearRunSave(){
+  try { localStorage.removeItem(RUN_KEY); } catch(e){}
+}
+
+/* ===================== ACHIEVEMENTS (v0.7.0.0.5) ===================== */
+/* 18 个成就, 每个 4 字中文名, 对应异常状态/结局/里程碑 */
+const ACHIEVEMENTS = {
+  /* — 异常状态 — */
+  st_depressed:    { name:"沉 入 海 底", desc:"第一次进入抑郁状态。"},
+  st_manic:        { name:"肾 上 飞 行", desc:"第一次进入亢奋状态。"},
+  st_drunk:        { name:"酒 后 自 由", desc:"第一次微醺。"},
+  st_hallu:        { name:"白 日 见 鬼", desc:"第一次产生幻觉。"},
+
+  /* — 结局: 弃工 — */
+  end_quit:        { name:"不 辞 而 别", desc:"在评审日之前按下电梯按钮离场。"},
+  end_quit_indie:  { name:"跑 路 自 救", desc:"积攒了独立火花后转身离开。"},
+
+  /* — 结局: 立项通过 — */
+  end_pass:        { name:"平 庸 通 关", desc:"项目立项通过，没什么特别的。"},
+  end_pass_indie:  { name:"双 线 并 行", desc:"工业项目通过，独立 demo 也上线了。"},
+  end_pass_dep:    { name:"带 病 通 关", desc:"几乎散架地把评审混了过去。"},
+  end_pass_te:     { name:"同 化 完 成", desc:"你成了\"上面\"那种人。"},
+
+  /* — 结局: 立项失败 — */
+  end_fail:        { name:"下 周 再 来", desc:"项目没立住，但你还在。"},
+  end_fail_indie:  { name:"另 起 炉 灶", desc:"项目黄了，独立 demo 反而被人看见。"},
+  end_fail_dep:    { name:"全 线 崩 溃", desc:"项目黄了，你也散架了。"},
+
+  /* — 里程碑 — */
+  first_run:       { name:"初 入 牢 笼", desc:"第一次开始这个游戏。"},
+  many_runs:       { name:"轮 回 不 止", desc:"完成 3 次或以上的周目。"},
+  jargon_master:   { name:"黑 话 满 贯", desc:"在字典里收齐了所有黑话。"},
+  iron_heart:      { name:"钢 铁 之 心", desc:"7 天内一次都没进入异常状态而通关。"},
+  five_aggregates: { name:"五 蕴 皆 苦", desc:"在同一周目里集齐 4 种异常状态。"},
+  memory_full:     { name:"记 忆 复 苏", desc:"集齐所有记忆碎片，不再失忆。"},
+};
+function achv(id){
+  if(META.achievements.has(id)) return;
+  META.achievements.add(id);
+  saveMeta();
+  const a = ACHIEVEMENTS[id];
+  if(a) showToast("解锁成就：" + a.name, "achv");
+}
+
+/* ===================== JARGON ===================== */
+const ALL_JARGON = [
+  /* 工业 / 公司 */
+  "KPI","OKR","DDL","MG","流水","长青","首日","二游","开SP","立项","主美","主策",
+  "配表","白盒","内推","N+1","35 岁","牛马","西西弗斯","996","997","Crunch",
+  "卤肉店","猫咖","压力面","跳板","P7","原画","数值","返工","解散",
+  /* 二次元 / 直播 / vtuber */
+  "推し","DD","二刺螈","破防","刀片","livehouse","Cosplay","小镇做题家",
+  "Vtuber","中之人","切片","套生","毕业","SC","弹幕","上号","一推",
+  "开播","下播","直播","b 站","油管","小红书","抖音","即刻","快乐耻辱",
+  "feature","IM","CCG","GameJam","BOCCHI","蓝档案","GBC",
+];
+const JARGON_DEFS = {
+  "KPI":      "上面下达的指标。完成了不一定有奖，没完成一定有惩罚。",
+  "OKR":      "比 KPI 更\"现代\"一点的指标。本质相同。",
+  "DDL":      "deadline。永远比你预想的更近。",
+  "MG":       "中台/Main Graphics。一个并不通用的圈内说法。",
+  "流水":     "游戏每天的营收。开发者命运的代名词。",
+  "长青":     "项目运营 3-5 年以上不死。多数项目第一年就死了。",
+  "首日":     "上线第一天的下载/留存。决定项目是否被砍。",
+  "二游":     "二次元手游。被反复称赞又反复看衰的赛道。",
+  "开SP":     "开特别活动 (Special)。通常意味着加班。",
+  "立项":     "项目被批准开发。在被立项之前所有人都是白干的。",
+  "主美":     "主美术。决定项目\"看上去\"长什么样的人。",
+  "主策":     "主策划。决定项目\"玩起来\"是什么样的人。",
+  "配表":     "配置数据表。游戏数值的根。",
+  "白盒":     "没有美术的最早可玩版本。所有东西都是白方块。",
+  "内推":     "通过认识的人内部推荐。比海投靠谱一点。",
+  "N+1":      "裁员补偿：工作 N 年给 N+1 个月工资。一个出现频率越来越高的词。",
+  "35 岁":    "互联网行业的隐形 ceiling。游戏行业也一样。",
+  "牛马":     "形容自己被剥削。一个 2024 年开始流行的自嘲。",
+  "西西弗斯": "推石头上山的人。每天工作的隐喻。",
+  "996":      "早 9 点到晚 9 点，一周 6 天。",
+  "997":      "比 996 更狠：早 9 到晚 9，一周 7 天。",
+  "Crunch":   "项目临近上线的集中加班期。",
+  "卤肉店":   "公司楼下那家便宜的午饭。",
+  "猫咖":     "猫咖啡店。下班的精神慰藉。",
+  "压力面":   "压力面试。HR 故意刁难看你怎么反应。",
+  "跳板":     "把当前公司当成下一站的中转。",
+  "P7":       "互联网职级编号。一般指中高级。",
+  "原画":     "美术里画概念图的人。",
+  "数值":     "策划里管数值平衡的人。最容易被骂的工种。",
+  "返工":     "做完了又被推翻重做。",
+  "解散":     "项目被砍，团队拆掉。",
+
+  "推し":     "二次元用法：\"我推的\"——我在追的偶像/角色。",
+  "DD":       "Dear Dear。同时推很多人的人。",
+  "二刺螈":   "二次元的自嘲式说法。",
+  "破防":     "心理防线被打破。从二游圈出来的网络用语。",
+  "刀片":     "剧情伤人。文学界叫\"虐心\"。",
+  "livehouse":"小型现场演出场所。",
+  "Cosplay":  "角色扮演。",
+  "小镇做题家":"小城出来靠考试爬上去的人。一种自嘲。",
+  "Vtuber":   "虚拟主播。背后有真人，前面是虚拟形象。",
+  "中之人":   "Vtuber 形象背后的真人。",
+  "切片":     "把直播剪成短视频的二创。",
+  "套生":     "套（外）生（活）。Vtuber 圈对中之人私生活的讳称。",
+  "毕业":     "Vtuber 圈内对结束活动的讳称。",
+  "SC":       "SuperChat。直播打赏的高亮留言。",
+  "弹幕":     "屏幕上滚过的实时评论。",
+  "上号":     "上线游戏。",
+  "一推":     "First Push。最重要/最先关注的那个偶像。",
+  "开播":     "开始直播。",
+  "下播":     "结束直播。",
+  "直播":     "实时网络播出。",
+  "b 站":     "Bilibili。",
+  "油管":     "YouTube。",
+  "小红书":   "小红书。",
+  "抖音":     "抖音。",
+  "即刻":     "一个轻量社交 App。",
+  "快乐耻辱": "对自己感到快乐这件事感到耻辱。一种当代心理状态。",
+  "feature":  "功能。游戏开发里指一个待做的玩法点。",
+  "IM":       "即时通讯。这里指公司内部的那个。",
+  "CCG":      "中央少儿动画频道（CCTV-Cartoon）。1990 年代末-00 年代初放过很多动画。",
+  "GameJam":  "限时做游戏的活动。通常 48 小时一个。",
+  "BOCCHI":   "《孤独摇滚》主角后藤一里的爱称。",
+  "蓝档案":   "《蔚蓝档案》。一款日式二次元学园策略手游。",
+  "GBC":      "Girls Band Cry。一部讲少女乐队的动画。",
+};
+function unlockJargon(w){
+  /* 自动归一化常见拼写不一致 */
+  if(w === "35岁") w = "35 岁";
+  if(!state.unlockedJargon.has(w)){
+    state.unlockedJargon.add(w);
+    showToast("解锁黑话：" + w, "jargon");
+  }
+  /* 跨周目持久化 */
+  if(!META.dictUnlocked.has(w)){
+    META.dictUnlocked.add(w);
+    saveMeta();
+    if(META.dictUnlocked.size >= ALL_JARGON.length) achv("jargon_master");
+  }
+}
+function isUnlocked(w){
+  if(w === "35岁") w = "35 岁";
+  return state.unlockedJargon.has(w);
+}
+
+/* ===================== SCHEDULE ===================== */
+const BASE_SCHEDULE = [
+  // Day 1 MON
+  {day:1, hour:9,  title:"打卡上班（你今天迟到了，还是早到了？）", category:"work", source:"自己", discovered:true, fixed:true},
+  {day:1, hour:14, title:"需求评审 · 工位组", category:"work", source:"日历", discovered:false},
+  {day:1, hour:21, title:"《孤独摇滚》Live OAD 上线", category:"life", source:"自己", discovered:true},
+  // Day 2 TUE
+  {day:2, hour:11, title:"跨部门同步会", category:"work", source:"邮件", discovered:false},
+  {day:2, hour:19, title:"小偶像 ★染织 生日 SP 直播", category:"life", source:"自己", discovered:true},
+  // Day 3 WED
+  {day:3, hour:15, title:"月度对齐会（主管说\"上面要听\"）", category:"boss", source:"主管", discovered:false},
+  {day:3, hour:22, title:"《MyGO!!!!!》第二季 · 第 6 话", category:"life", source:"自己", discovered:true},
+  // Day 4 THU
+  {day:4, hour:14, title:"美术大返工评审", category:"work", source:"米米", discovered:false},
+  {day:4, hour:20, title:"自己的独立游戏 demo · 提交 DDL", category:"life", source:"自己", discovered:true},
+  // Day 5 FRI
+  {day:5, hour:13, title:"周五午饭后困到溶解", category:"life", source:"自己", discovered:true},
+  {day:5, hour:18, title:"周五项目对齐 · 主管要看进度", category:"work", source:"主管", discovered:false},
+  // Day 6 SAT
+  {day:6, hour:11, title:"周六加班（自愿，但不是真的自愿）", category:"work", source:"主管", discovered:false},
+  {day:6, hour:21, title:"小偶像 ★染织 周末 livehouse", category:"life", source:"自己", discovered:true},
+  // Day 7 SUN
+  {day:7, hour:14, title:"评审前的最后冲刺", category:"work", source:"自己", discovered:true},
+  {day:7, hour:23, title:"自己的独立游戏 demo · 提交 DDL", category:"life", source:"自己", discovered:true},
+  // Day 8 — 评审日
+  {day:8, hour:10, title:"·  项  目  立  项  评  审  ·", category:"boss", source:"上面", discovered:true},
+];
+function discoverSchedule(matcher){
+  for(const e of state.schedule){
+    if(!e.discovered && matcher(e)){
+      e.discovered = true;
+      showToast("日程更新：" + e.title, "sched");
+    }
+  }
+}
+
+/* ===================== SPECIAL STATE ===================== */
+function setState(name, hours){
+  state.specialState = { name, remaining: hours };
+  if(name==="depressed") state.depressedTimes++;
+  /* 同周目集齐 4 种异常 */
+  if(!state.abnormalsHit) state.abnormalsHit = new Set();
+  state.abnormalsHit.add(name);
+  if(state.abnormalsHit.size >= 4) achv("five_aggregates");
+  /* 单项首次解锁 */
+  achv("st_" + name);
+  const labels = {
+    depressed:"·  抑  郁  ·",
+    manic:    "·  亢  奋  ·",
+    drunk:    "·  微  醺  ·",
+    hallu:    "·  幻  觉  ·",
+  };
+  document.getElementById("statetxt").innerText = labels[name] || "—";
+  document.getElementById("statetxt").classList.remove("empty");
+  floatText("进入状态：" + (labels[name]||name));
+}
+function clearState(){
+  state.specialState = null;
+  const el = document.getElementById("statetxt");
+  if(state.anxietyActive){
+    el.innerText = "·  焦  虑  ·";
+    el.classList.remove("empty");
+  } else {
+    el.innerText = "—";
+    el.classList.add("empty");
+  }
+}
+function tickState(hours){
+  if(!state.specialState) return;
+  state.specialState.remaining -= hours;
+  if(state.specialState.remaining <= 0){
+    floatText("状态消退");
+    clearState();
+  }
+}
+
+/* ===================== STATE ===================== */
+let state = freshState();
+function freshState(){
+  const phases = {};
+  for(const fn of FN_LIST) phases[fn] = { progress:0, max: PHASE_INFO[fn].max };
+  /* 起始：男睡眠仓 (1,2)，朝下；田站在 (3,3) 等你 */
+  return {
+    /* movement */
+    player:{
+      room:"male_pod",
+      x:1, y:2,
+      px:1*TILE, py:2*TILE,
+      tx:1, ty:2,
+      moving:false, moveT:0, moveDur:8,
+      dir:"down",
+    },
+    pendingDoor:null,
+    npcOverride:[ { id:"tian", room:"male_pod", x:3, y:3 } ],
+    day:1, hour:9, minute:0,
+    totalDays: 7,
+    keywords:[],
+    flags:{},
+    npcLastHour:{},
+    computerSessionsToday:0, coffeeToday:0, sleepPodToday:0,
+    overtimeCount:0,
+    overtimeStreak:0,
+    depressedTimes:0,
+    anxietyActive:false,
+    anxietyRestDays:0,
+    glitchLevel:0,
+    gameOver:false,
+    introDone:false,
+    amnesia:true,
+    memoryFragments:[],
+
+    /* MBTI */
+    mbti:"INFP",
+    functions: initFromMBTI("INFP"),
+    dailyFnDelta:{},
+
+    /* jargon: 跨周目已学过的直接继承 */
+    unlockedJargon: new Set(META.dictUnlocked),
+
+    /* 本周目已经触发过的异常状态 */
+    abnormalsHit: new Set(),
+
+    /* schedule */
+    schedule: JSON.parse(JSON.stringify(BASE_SCHEDULE)),
+
+    /* special state */
+    specialState: null,
+    talkingNpcId:null,
+
+    /* NPC 社交 */
+    npcAffinity: {},
+    npcBondRoute: {},
+
+    /* 电梯下班彩蛋：选过就不再出现 */
+    elevatorAfterworkUsed: {},
+
+    /* 立项偏好统计（评审时决定项目名） */
+    projectFocus:{
+      art:0, qa:0, program:0, design:0,
+      system:0, experience:0, coordination:0,
+    },
+
+    /* project */
+    project: { progress: 0, phases },
+    canEndDay: false,  /* 18:00 之后才能从电梯主动下班 */
+  };
+}
+
+/* ===================== HELPERS ===================== */
+let floaters = [];
+function floatText(t){
+  const { ox, oy } = roomOffset();
+  floaters.push({ t, life:90, x:state.player.px+TILE/2+ox, y:state.player.py-4+oy });
+}
+/* 纵向队列 · 逐条入场 (避免多条同时出现挤在一起) · 长驻时间 · 长淡出 */
+const TOAST_ENTER_STAGGER = 260;  /* 两条之间至少间隔多久再入场 */
+const TOAST_DWELL         = 4400; /* 每条停留多久 */
+const TOAST_FADE          = 1200; /* 淡出动画耗时 (与 CSS .fadeout transition 对齐) */
+const toastQueue = [];
+let toastPumping = false;
+function showToast(t, kind){
+  toastQueue.push({ t, kind });
+  if(!toastPumping) pumpToast();
+}
+function pumpToast(){
+  const item = toastQueue.shift();
+  if(!item){ toastPumping = false; return; }
+  toastPumping = true;
+  const stack = document.getElementById("toastStack");
+  const el = document.createElement("div");
+  el.className = "toastItem" + (item.kind ? " "+item.kind : "");
+  el.innerText = item.t;
+  stack.appendChild(el);
+  requestAnimationFrame(()=> el.classList.add("show"));
+  setTimeout(()=>{
+    el.classList.remove("show");
+    el.classList.add("fadeout");
+    setTimeout(()=> el.remove(), TOAST_FADE + 50);
+  }, TOAST_DWELL);
+  setTimeout(pumpToast, TOAST_ENTER_STAGGER);
+}
+
+const WEEK = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
+function dirVec(d){
+  if(d==="up")    return [0,-1];
+  if(d==="down")  return [0,1];
+  if(d==="left")  return [-1,0];
+  return [1,0];
+}
+function escHtml(s){
+  return s.replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+}
+
+/* 记忆碎片总集 (用于成就) */
+const MEMORY_TOTAL = 24;
+function recordMemory(t){
+  if(!state.memoryFragments.includes(t)){
+    state.memoryFragments.push(t);
+    floatText("记起来一点："+t);
+    if(state.memoryFragments.length >= 3) state.amnesia = false;
+    if(state.memoryFragments.length >= MEMORY_TOTAL) achv("memory_full");
+  }
+}
+
+/* ===================== TEXT TOKENIZE ===================== */
+function tokenize(text){
+  const out = [];
+  const re = /\[\[([^\]]+)\]\]/g;
+  let last = 0, m;
+  while((m = re.exec(text)) !== null){
+    for(let i=last;i<m.index;i++){
+      const c = text[i];
+      out.push(c==="\n" ? {t:"nl"} : {t:"c", c});
+    }
+    out.push({t:"j", w:m[1]});
+    last = m.index + m[0].length;
+  }
+  for(let i=last;i<text.length;i++){
+    const c = text[i];
+    out.push(c==="\n" ? {t:"nl"} : {t:"c", c});
+  }
+  return out;
+}
+
+/* ===================== SCENE ENGINE ===================== */
+let scene = null, sceneIdx = 0;
+let typingTokens = [], typingIdx = 0, typingDone = true;
+let typingTimer = null;
+let pendingChoice = null, pendingChoiceOpts = null, pendingChoiceRaw = null;
+let choiceSel = 0;
+
+function runScene(s){
+  scene = s; sceneIdx = 0;
+  document.getElementById("dialogue").classList.add("show");
+  nextStep();
+}
+
+function nextStep(){
+  if(state.gameOver || daySummaryShown){
+    scene=null; pendingChoice=null;
+    document.getElementById("dialogue").classList.remove("show");
+    hideChoices();
+    clearInterval(typingTimer);
+    return;
+  }
+  hideChoices();
+  if(!scene || sceneIdx >= scene.length){
+    endScene(); return;
+  }
+  const step = scene[sceneIdx++];
+  if(step.type==="say"){
+    document.getElementById("dName").innerText = step.name || "";
+    document.getElementById("dName").style.display = step.name ? "block":"none";
+    startTyping(step.text || "");
+  } else if(step.type==="choice"){
+    document.getElementById("dName").innerText = step.name || "*";
+    document.getElementById("dName").style.display = "block";
+    pendingChoice = step;
+    startTyping(step.prompt || "");
+  } else if(step.type==="act"){
+    const before = scene;
+    const beforeIdx = sceneIdx;
+    try{ step.fn && step.fn(); }catch(e){console.error(e);}
+    if(state.gameOver || daySummaryShown) return;
+    if(scene === before) nextStep();
+    else {
+      const remaining = before.slice(beforeIdx);
+      if(remaining.length) scene.push(...remaining);
+    }
+  }
+}
+
+function startTyping(text){
+  typingTokens = tokenize(text);
+  typingIdx = 0; typingDone = false;
+  document.getElementById("dBody").innerHTML = "";
+  document.getElementById("dTip").style.display = "none";
+  clearInterval(typingTimer);
+  typingTimer = setInterval(()=>{
+    typingIdx++; renderBody();
+    if(typingIdx >= typingTokens.length) finishTyping();
+  }, 28);
+}
+function renderBody(){
+  let html = "";
+  const limit = Math.min(typingIdx, typingTokens.length);
+  for(let i=0;i<limit;i++){
+    const t = typingTokens[i];
+    if(t.t==="nl") html += "<br>";
+    else if(t.t==="c") html += escHtml(t.c);
+    else if(t.t==="j"){
+      if(isUnlocked(t.w)){
+        html += `<span class="redact unlocked">${escHtml(t.w)}</span>`;
+      } else {
+        html += `<span class="redact">${"█".repeat(Math.max(2, [...t.w].length))}</span>`;
+      }
+    }
+  }
+  const body = document.getElementById("dBody");
+  if(state.specialState && (state.specialState.name==="depressed" || state.specialState.name==="hallu")){
+    body.classList.add("glitch");
+    if(state.specialState.name==="hallu" && Math.random() < 0.06){
+      const pos = Math.floor(Math.random()*html.length);
+      html = html.slice(0,pos) + "█" + html.slice(pos);
+    }
+  } else body.classList.remove("glitch");
+  body.innerHTML = html;
+}
+function finishTyping(){
+  clearInterval(typingTimer);
+  typingDone = true;
+  typingIdx = typingTokens.length;
+  renderBody();
+  document.getElementById("dTip").style.display = "block";
+  if(pendingChoice){
+    showChoices(pendingChoice.options || pendingChoice.options8, !!pendingChoice.showAll8);
+    pendingChoice = null;
+  }
+}
+function forceFinishTyping(){
+  if(!typingDone){
+    typingIdx = typingTokens.length;
+    finishTyping();
+  }
+}
+function endScene(){
+  scene = null; sceneIdx = 0; pendingChoice = null;
+  state.talkingNpcId = null;
+  document.getElementById("dialogue").classList.remove("show");
+  hideChoices();
+  draw();
+}
+
+/* ===================== CHOICES ===================== */
+/* 检查选项文本里有没有 [[xxx]] 黑话, 任意一个未解锁 = 选项被黑话锁 */
+function jargonLockOption(opt){
+  if(!opt || !opt.text) return null;
+  const re = /\[\[([^\]]+)\]\]/g; let m;
+  const missing = [];
+  while((m = re.exec(opt.text)) !== null){
+    const w = m[1];
+    if(!isUnlocked(w)) missing.push(w);
+  }
+  return missing.length ? missing : null;
+}
+/* 把锁住的选项标记 (保留原 locked 与 jlocked 的区别)*/
+function applyJargonLock(opts){
+  for(const o of opts){
+    const miss = jargonLockOption(o);
+    if(miss && !o.locked){
+      o.jlocked = true;
+      o.note = "你听不懂 「" + miss[0] + "」 这个词。\n等你听到别人说过它，再回来。";
+    }
+  }
+}
+function showChoices(options8, showAll8){
+  const c = document.getElementById("choices");
+  c.classList.add("show");
+  pendingChoiceRaw = options8;
+  if(options8) options8.__showAll = !!showAll8;
+
+  const list = [];
+  if(showAll8){
+    /* 8 个选项全开放，按 Ne/Ni/Ti/Te/Fi/Fe/Si/Se 顺序排列 */
+    const order = ["Ne","Ni","Ti","Te","Fi","Fe","Si","Se"];
+    order.forEach(fn=>{
+      const opt = options8[fn];
+      if(opt) list.push({...opt, func:fn, group:"main"});
+    });
+  } else {
+    const stack = topStack();
+    const top4 = stack.slice(0,4);
+    const shadow = stack.slice(4,8);
+    top4.forEach(fn=>{
+      const opt = options8[fn];
+      if(opt) list.push({...opt, func:fn, group:"main"});
+    });
+    if(state.specialState){
+      shadow.forEach(fn=>{
+        const opt = options8[fn];
+        if(opt) list.push({...opt, func:fn, group:"shadow"});
+      });
+    }
+  }
+  if(options8._plain){
+    for(const p of options8._plain){
+      list.push({...p, func:"--", group:"main"});
+    }
+  }
+  applyJargonLock(list);
+  if(state.specialState && state.specialState.name==="drunk"){
+    const main = list.filter(o=>o.group==="main");
+    const sha  = list.filter(o=>o.group==="shadow");
+    main.sort(()=> Math.random()-0.5);
+    pendingChoiceOpts = main.concat(sha);
+  } else {
+    pendingChoiceOpts = list;
+  }
+  choiceSel = 0;
+  renderChoiceList();
+}
+function stateLabel(n){
+  return ({depressed:"抑郁",manic:"亢奋",drunk:"微醺",hallu:"幻觉"})[n] || n;
+}
+function renderChoiceList(){
+  const c = document.getElementById("choices");
+  c.innerHTML = "";
+  const labelMain = document.createElement("div");
+  labelMain.className = "group-label";
+  labelMain.innerText = "·  你 的 第 一 反 应  ·";
+  c.appendChild(labelMain);
+  pendingChoiceOpts.forEach((o, idx)=>{
+    if(o.group !== "main") return;
+    const d = document.createElement("div");
+    d.className = "opt"
+      + (o.locked?" locked":"")
+      + (o.jlocked?" jlocked":"")
+      + (idx===choiceSel?" sel":"");
+    d.innerHTML = `<span class="ftag">${o.func}</span>${escHtml(o.text).replace(/\[\[([^\]]+)\]\]/g, (_,w)=>
+      isUnlocked(w) ? `<span style="color:#ffe100">${escHtml(w)}</span>` : "█".repeat(Math.max(2,[...w].length))
+    )}`;
+    c.appendChild(d);
+  });
+  const hasShadow = pendingChoiceOpts.some(o=>o.group==="shadow");
+  if(hasShadow){
+    const labelShadow = document.createElement("div");
+    labelShadow.className = "group-label";
+    labelShadow.innerText = `·  「${stateLabel(state.specialState.name)}」  让 你 听 见 别 的 声 音  ·`;
+    c.appendChild(labelShadow);
+    pendingChoiceOpts.forEach((o, idx)=>{
+      if(o.group !== "shadow") return;
+      const d = document.createElement("div");
+      d.className = "opt shadow"
+        + (o.locked?" locked":"")
+        + (o.jlocked?" jlocked":"")
+        + (idx===choiceSel?" sel":"");
+      d.innerHTML = `<span class="ftag">${o.func}</span>${escHtml(o.text).replace(/\[\[([^\]]+)\]\]/g, (_,w)=>
+        isUnlocked(w) ? `<span style="color:#ffe100">${escHtml(w)}</span>` : "█".repeat(Math.max(2,[...w].length))
+      )}`;
+      c.appendChild(d);
+    });
+  }
+}
+function hideChoices(){
+  const c = document.getElementById("choices");
+  c.classList.remove("show");
+  c.innerHTML = "";
+  pendingChoiceOpts = null;
+  pendingChoiceRaw = null;
+}
+function moveChoice(d){
+  if(!pendingChoiceOpts) return;
+  choiceSel = (choiceSel + d + pendingChoiceOpts.length) % pendingChoiceOpts.length;
+  renderChoiceList();
+}
+function pickChoice(){
+  if(!pendingChoiceOpts) return;
+  const opt = pendingChoiceOpts[choiceSel];
+  if(opt.jlocked){
+    /* 黑话锁: 提示一下, 不消费回合, 让玩家重选 */
+    showToast(opt.note || "你听不懂这话。", "note");
+    return;
+  }
+  if(opt.locked){
+    hideChoices();
+    runScene([{type:"say", name:"*", text: opt.note || "（你说不出口。）"}]);
+    return;
+  }
+  hideChoices();
+  if(opt.func && opt.func !== "--"){
+    const amt = (opt.group==="shadow") ? 5 : 4;
+    boostZeroSum(opt.func, amt);
+  }
+  if(state.talkingNpcId) adjustNpcAffinity(state.talkingNpcId, opt.func, opt.group);
+  const forced = maybeOverrideChoice(opt);
+  if(forced){ scene = forced; sceneIdx=0; nextStep(); return; }
+  if(opt.fn){
+    const before = scene;
+    const beforeIdx = sceneIdx;
+    opt.fn();
+    if(state.gameOver || daySummaryShown) return;
+    if(scene === before){ nextStep(); }
+    else {
+      const remaining = before.slice(beforeIdx);
+      if(remaining.length) scene.push(...remaining);
+    }
+  } else {
+    nextStep();
+  }
+}
+
+/* Forced action when in 抑郁 state */
+const FORCED_SCENES = [
+  [{type:"say", name:"*", text:"你想点下去。\n但你发现自己打开了工作文档。"},
+   {type:"act", fn:()=>{ advanceMinutes(60); }}],
+  [{type:"say", name:"*", text:"你听见自己说：\n\"好的，没问题。\""},
+   {type:"act", fn:()=>{ advanceMinutes(30); }}],
+  [{type:"say", name:"*", text:"你在群里回了一个 OK 表情。\n没人说话。"},
+   {type:"act", fn:()=>{ /* no time */ }}],
+];
+function maybeOverrideChoice(opt){
+  if(state.specialState && state.specialState.name==="depressed" && Math.random() < 0.30){
+    return FORCED_SCENES[Math.floor(Math.random()*FORCED_SCENES.length)];
+  }
+  return null;
+}
+
+/* ===================== TIME ===================== */
+function advanceMinutes(m){
+  if(state.gameOver) return;
+  if(state.specialState && state.specialState.name==="manic") m = Math.round(m * 1.4);
+  state.minute += m;
+  let triggered18 = false;
+  while(state.minute >= 60){
+    state.minute -= 60;
+    state.hour++;
+    tickState(1);
+    state.npcLastHour = {};
+    if(state.hour === 18 && !state.flags["d"+state.day+"_18"]){
+      state.flags["d"+state.day+"_18"] = true;
+      state.canEndDay = true;
+      triggered18 = true;
+    }
+    if(state.hour >= 22){ updateHUD(); forceSleep(); return; }
+  }
+  updateHUD();
+  if(triggered18){
+    floatText("18:00 · 电梯可下班");
+    runScene([
+      {type:"say", name:"系统",
+       text:"18:00。\n屏幕右下角弹出\"辛苦了\"。\n群里有人发\"哥们走了\"。\n\n（电梯按钮亮了。\n你可以去按它，结束今天。）"},
+      {type:"act", fn:()=>{
+        if(state.hour >= 18) state.overtimeCount; /* not yet overtime */
+      }},
+    ]);
+  } else if(state.hour > 18 && !state.flags["d"+state.day+"_overtimeMark"]){
+    /* first work tick after 18:00 = officially overtime */
+    state.flags["d"+state.day+"_overtimeMark"] = true;
+    state.overtimeCount++;
+    if(!state.specialState && state.overtimeCount >= 2) maybeEnterDepressed(0.45);
+  }
+}
+function forceSleep(){
+  runScene([
+    {type:"say", name:"系统",
+     text:"22:00。\n大多数灯都灭了。\n空调被关了，风变冷。"},
+    {type:"say", name:"*",
+     text:"你听见自己很慢地呼吸。\n你不想动。"},
+    {type:"act", fn:()=>{ endOfDay("crashed"); }},
+  ]);
+}
+function endOfDay(exitMode){
+  settleAnxietyAtEndOfDay();
+  const oldMbti = state.mbti;
+  const newMbti = computeMBTI(state.functions);
+  state.mbti = newMbti;
+  const dsLines = document.getElementById("dsLines");
+  const todayName = WEEK[(state.day-1)%7];
+  let lines = "——  DAY "+state.day+" · "+todayName+"  结束  ——";
+  lines += "\n项目进度：" + Math.round(state.project.progress) + " %";
+  lines += "\n解锁黑话：" + state.unlockedJargon.size;
+  lines += "\n记忆碎片：" + (state.memoryFragments.length||"—");
+  if(state.anxietyActive) lines += "\n焦虑状态：持续中";
+  else if(state.flags.anxietyClearedToday) lines += "\n焦虑状态：已消退";
+  if(exitMode==="crashed")     lines += "\n\n（你最后是在工位上睡着的。）";
+  else if(exitMode==="left")   lines += "\n\n（你按时下了班。）";
+  else if(exitMode==="slept")  lines += "\n\n（你在睡眠仓里过的夜。）";
+  else if(exitMode==="quit")   lines += "\n\n（你提前走了。）";
+  dsLines.innerText = lines;
+  document.getElementById("dsMbti").innerText = newMbti;
+  const deltas = Object.entries(state.dailyFnDelta).filter(e=>Math.abs(e[1])>=1);
+  document.getElementById("dsDelta").innerText =
+    (oldMbti !== newMbti ? "类型变化：" + oldMbti + " → " + newMbti : "类型未变。") +
+    (deltas.length ? "\n（涨：" + deltas.filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]).join(" / ") +
+      "  ·  跌：" + deltas.filter(e=>e[1]<0).sort((a,b)=>a[1]-b[1]).slice(0,3).map(e=>e[0]).join(" / ") + "）" : "");
+  document.getElementById("daySummary").classList.add("show");
+  state.dailyFnDelta = {};
+  daySummaryShown = true;
+}
+let daySummaryShown = false;
+
+function dismissDaySummary(){
+  document.getElementById("daySummary").classList.remove("show");
+  daySummaryShown = false;
+  state.day++;
+  state.hour = 9; state.minute = 0;
+  state.computerSessionsToday = 0; state.coffeeToday = 0; state.sleepPodToday = 0;
+  state.npcLastHour = {};
+  state.canEndDay = false;
+  if(state.specialState) clearState();
+  updateHUD(); draw();
+  if(state.day > state.totalDays){
+    runReview();
+    return;
+  }
+  const wakeLines = [
+    "你又在工位醒来。\n屏幕还亮着。",
+    "你又在工位醒来。\n你不记得是怎么回到工位的。",
+    "你睁开眼。\n阳光从百叶窗的缝里漏进来。\n你不记得自己是不是真的休息了。",
+    "你醒来。\n手机锁屏上还是昨晚的群消息。",
+  ];
+  runScene([
+    {type:"say", name:"系统",
+     text:"——  DAY "+state.day+" · "+WEEK[(state.day-1)%7]+"  ——\n"+wakeLines[Math.floor(Math.random()*wakeLines.length)]},
+    ...(state.flags.anxietyJustTriggered ? [{
+      type:"say", name:"系统",
+      text:"你连续两天都加班到很晚。\n你开始焦虑。\n从今天起，HUD 里的 Day 会偶尔乱跳。"
+    }] : []),
+    ...(state.flags.anxietyClearedToday ? [{
+      type:"say", name:"系统",
+      text:"你终于缓下来了一点。\n第二天早上，日期不再乱跳。\n焦虑状态解除。"
+    }] : []),
+  ]);
+  state.flags.anxietyJustTriggered = false;
+  state.flags.anxietyClearedToday = false;
+}
+
+/* ===================== MOVEMENT ===================== */
+const held = {up:false,down:false,left:false,right:false};
+
+function attemptStep(){
+  const p = state.player;
+  if(p.moving || scene || state.gameOver || titleShown || mbtiSetupOn ||
+     daySummaryShown || scheduleOpen || mapViewOpen || state.pendingDoor) return;
+  let dir = null;
+  if(held.up) dir="up";
+  else if(held.down) dir="down";
+  else if(held.left) dir="left";
+  else if(held.right) dir="right";
+  if(!dir) return;
+  p.dir = dir;
+
+  if(state.specialState && state.specialState.name==="depressed" && Math.random()<0.18){
+    floatText("（动不了。）");
+    return;
+  }
+  const [dx,dy] = dirVec(dir);
+  const nx = p.x + dx, ny = p.y + dy;
+  if(isBlocked(nx,ny)) return;
+  if(npcHere(nx,ny)) return;
+  p.tx = nx; p.ty = ny;
+  p.moving = true; p.moveT = 0;
+}
+function updateMovement(){
+  const p = state.player;
+  if(p.moving){
+    p.moveT++;
+    const t = Math.min(1, p.moveT / p.moveDur);
+    p.px = (p.x*TILE)*(1-t) + (p.tx*TILE)*t;
+    p.py = (p.y*TILE)*(1-t) + (p.ty*TILE)*t;
+    if(p.moveT >= p.moveDur){
+      p.x = p.tx; p.y = p.ty;
+      p.px = p.x*TILE; p.py = p.y*TILE;
+      p.moving = false;
+      /* 走到门 → 弹出确认 */
+      const door = doorAt(p.room, p.x, p.y);
+      if(door) promptDoor(door);
+    }
+  } else {
+    attemptStep();
+  }
+}
+
+/* 进入新房间的随机事件（电梯偷听 / 茶水间八卦 / 吸烟区悲鸣） */
+const OVERHEAR = {
+  elevator_2f: [
+    { line:"……我跟你说，「跳板」厂跟我对了三轮，给的还行……", j:["跳板"] },
+    { line:"我们组明天又要 [[OKR]] 评议。\n你猜我能不能保 B+。", j:["OKR"] },
+    { line:"\"上面说要 [[长青]]。\"\n\"上面又说要 [[首日]] 流水。\"\n\"上面到底要哪一个？\"", j:["长青","首日"] },
+  ],
+  lobby: [
+    { line:"前台姐姐压低声音：\n\"刚才面试那个 [[35 岁]] 的，估计悬。\"", j:["35 岁"] },
+    { line:"门口快递员喊一声：\n\"项目 [[N+1]] 大礼包，签收一下。\"\n几个人没笑。", j:["N+1"] },
+  ],
+  smoking: [
+    { line:"穿格子衫的男人对着烟说：\n\"做了 8 年 [[二游]]，眼睛快瞎了。\"", j:["二游"] },
+    { line:"短发女生发着语音：\n\"我跟你讲，[[997]] 不是人干的。\"", j:["997"] },
+    { line:"另一个公司的人在抱怨：\n\"我们项目 [[Crunch]] 三个月了，DDL 还往后挪。\"", j:["Crunch","DDL"] },
+  ],
+  rooftop: [
+    { line:"晚风很大。\n远处的虹桥机场有飞机起飞。\n你想起那年想做的 [[GameJam]] 作品。", j:["GameJam"] },
+  ],
+  pantry: [
+    { line:"\"哎你看 BB 又在刷 [[弹幕]]。\"\n\"那不是公司禁的吗。\"\n\"嘘——\"", j:["弹幕"] },
+  ],
+};
+function maybeRoomEnterEvent(roomId){
+  const list = OVERHEAR[roomId];
+  if(!list || Math.random() > 0.55) return;
+  const e = list[Math.floor(Math.random()*list.length)];
+  setTimeout(()=>{
+    runScene([
+      {type:"say", name:"* "+ROOMS[roomId].name+" · 你听见", text: e.line},
+      {type:"act", fn:()=>{ (e.j||[]).forEach(j=>unlockJargon(j)); }},
+    ]);
+  }, 80);
+}
+
+/* 房间切换：弹出确认 */
+function promptDoor(door){
+  if(state.pendingDoor) return;
+  state.pendingDoor = door;
+  document.getElementById("doorPrompt").innerText =
+    door.label + "\n\n[ Z ] 进入   [ X ] 取消";
+  document.getElementById("doorOverlay").classList.add("show");
+}
+function confirmDoor(){
+  const d = state.pendingDoor;
+  if(!d) return;
+  state.pendingDoor = null;
+  document.getElementById("doorOverlay").classList.remove("show");
+  changeRoom(d.to, d.toX, d.toY);
+}
+function cancelDoor(){
+  state.pendingDoor = null;
+  document.getElementById("doorOverlay").classList.remove("show");
+  /* 把玩家从门 tile 推一格回去（朝相反方向） */
+  const p = state.player;
+  const opp = { up:"down", down:"up", left:"right", right:"left" }[p.dir];
+  const [dx,dy] = dirVec(opp);
+  const nx = p.x + dx, ny = p.y + dy;
+  if(!isBlocked(nx, ny) && !npcHere(nx, ny)){
+    p.x = nx; p.y = ny;
+    p.px = nx*TILE; p.py = ny*TILE;
+    p.tx = nx; p.ty = ny;
+    p.dir = opp;
+  }
+}
+function changeRoom(roomId, x, y){
+  const p = state.player;
+  p.room = roomId;
+  p.x = x; p.y = y;
+  p.px = x*TILE; p.py = y*TILE;
+  p.tx = x; p.ty = y;
+  p.moving = false; p.moveT = 0;
+  /* 进入新房间随机偷听 / 触发事件 */
+  maybeRoomEnterEvent(roomId);
+  draw(); updateHUD();
+}
+
+/* ===================== INTERACT ===================== */
+function tryInteract(){
+  if(state.gameOver) return;
+  if(scene || state.pendingDoor || mapViewOpen) return;
+  const p = state.player;
+  if(p.moving) return;
+  const [dx,dy] = dirVec(p.dir);
+  const tx = p.x+dx, ty = p.y+dy;
+  const n = npcHere(tx,ty);
+  if(n){ talkTo(n); return; }
+  const t = tileAt(currentRoom(), tx, ty);
+  if(t==="F") return interactDesk();
+  if(t==="D") return interactColleagueDesk(tx, ty);
+  if(t==="M") return interactMeetingTable();
+  if(t==="S") return interactSleepPod("M");
+  if(t==="Q") return interactSleepPod("F");
+  if(t==="C") return interactCoffee();
+  if(t==="P") return interactPrinter();
+  if(t==="B") return interactBoard();
+  if(t==="L") return interactSofaForum();
+  if(t==="N") return interactNoticeBoard();
+  if(t==="m") return interactMirror();
+  if(t==="w") return interactWindow();
+  if(t==="T") return interactToilet();
+  if(t==="E") return interactElevator();
+  if(t==="g") return interactGym();
+  if(t==="X") return interactSmoke();
+  if(t==="r") return interactRailing();
+  if(t==="R") return interactReception();
+  runScene([{type:"say", name:"*",
+    text:"你在 "+regionName()+"。\n"+
+         (Math.random()<0.5?"什么都没发生。":"你在听空调的声音。")}]);
+}
+
+/* ===================== NPCS ===================== */
+/* schedule[hour] = [room_id, x, y] */
+const NPCS = [
+  /* 田 — 第一天醒来时在男睡眠仓 (intro 时手动放置)，之后回工区 */
+  { id:"tian",  name:"田 / 二游老兵",        color:"#5a7ad8", hair:"#202024", mbti:"ISTJ", likes:["Si","Te","Fe"], dislikes:["Ne","Fi"],
+    schedule:{ 11:["pantry",      3,3],
+               14:["work_area",   8,1],
+               15:["meeting",     7,3],
+               17:["corridor_2f", 6,3] } },
+  { id:"lin",   name:"小林 / 策划",           color:"#6fa8ff", hair:"#2a2a2a", mbti:"ENFP", likes:["Ne","Fi","Fe"], dislikes:["Te"],
+    schedule:{ 9: ["work_area",   5,1],
+               10:["work_area",   5,1],
+               11:["work_area",   5,1],
+               14:["meeting",     4,3],
+               15:["meeting",     4,3],
+               16:["work_area",   5,1] } },
+  { id:"mimi",  name:"米米 / 原画",           color:"#ff8fc8", hair:"#c14b88", mbti:"ISFP", likes:["Fi","Se","Ne"], dislikes:["Te"],
+    schedule:{ 10:["pantry",      3,2],
+               11:["pantry",      3,2],
+               14:["work_area",   2,4],
+               15:["work_area",   2,4],
+               16:["pantry",      3,2],
+               17:["smoking",     3,2] } },
+  { id:"zheye", name:"哲也 / 程序",           color:"#303642", hair:"#101018", mbti:"INTP", likes:["Ti","Ni","Ne"], dislikes:["Fe"],
+    schedule:{ 11:["work_area",   8,1],
+               12:["work_area",   8,1],
+               13:["work_area",   8,1],
+               15:["pantry",      8,2],
+               16:["work_area",   8,1],
+               17:["work_area",   8,1] } },
+  { id:"cheng", name:"橙子 / 主策",           color:"#c67b3a", hair:"#3a251a", mbti:"ENTJ", likes:["Te","Ni","Fe"], dislikes:["Si"],
+    schedule:{ 10:["meeting",     5,3],
+               11:["meeting",     5,3],
+               14:["work_area",   5,1],
+               15:["meeting",     6,3] } },
+  { id:"gz",    name:"GZ / 管线负责人",       color:"#aaaaaa", hair:"#555555", mbti:"ESTJ", likes:["Te","Si","Se"], dislikes:["Ne"],
+    schedule:{ 11:["meeting",     3,3],
+               14:["meeting",     3,3],
+               15:["corridor_2f", 4,3] } },
+  { id:"bb",    name:"B / 数据分析",          color:"#c94242", hair:"#1b1b1b", mbti:"INFJ", likes:["Fi","Ni","Fe"], dislikes:["Se"],
+    schedule:{ 9: ["work_area",   8,4],
+               10:["work_area",   8,4],
+               14:["work_area",   8,4],
+               15:["pantry",      8,1] } },
+  { id:"yusha", name:"Yusha / 资深美术",      color:"#768a4a", hair:"#241e12", mbti:"ENFJ", likes:["Fe","Fi","Si"], dislikes:["Ti"],
+    schedule:{ 13:["work_area",   2,4],
+               16:["smoking",     7,2],
+               17:["rooftop",     7,4] } },
+  { id:"ayi",   name:"保洁阿姨",               color:"#456a9a", hair:"#888888", mbti:"ESFJ", likes:["Fe","Si","Se"], dislikes:["Ni"],
+    schedule:{ 12:["corridor_2f", 7,3],
+               13:["restroom_2f", 5,2],
+               17:["lobby",       5,4] } },
+  { id:"tugou", name:"土狗 / 总制作人",        color:"#ffd166", hair:"#7b4d12", mbti:"ENTP", likes:["Ne","Te","Ti"], dislikes:["Si"], schedule:{} },
+];
+function npcAtHour(n, hour){
+  const e = n.schedule[hour];
+  if(!e) return null;
+  return { room:e[0], x:e[1], y:e[2] };
+}
+function npcHere(x,y){
+  /* 当前房间内、当前小时在该格的 NPC */
+  for(const n of NPCS){
+    const pos = npcAtHour(n, state.hour);
+    if(pos && pos.room === state.player.room && pos.x===x && pos.y===y) return n;
+  }
+  /* 也包括 intro 等场景手动放置的 NPC */
+  if(state.npcOverride){
+    for(const o of state.npcOverride){
+      if(o.room === state.player.room && o.x===x && o.y===y){
+        return NPCS.find(nn=>nn.id===o.id) || null;
+      }
+    }
+  }
+  return null;
+}
+function npcsInRoom(roomId, hour){
+  const list = [];
+  for(const n of NPCS){
+    const pos = npcAtHour(n, hour);
+    if(pos && pos.room === roomId){
+      list.push({ npc:n, x:pos.x, y:pos.y });
+    }
+  }
+  if(state.npcOverride){
+    for(const o of state.npcOverride){
+      if(o.room === roomId){
+        const n = NPCS.find(nn=>nn.id===o.id);
+        if(n) list.push({ npc:n, x:o.x, y:o.y });
+      }
+    }
+  }
+  return list;
+}
+
+function ensureNpcSocialState(){
+  if(!state.npcAffinity) state.npcAffinity = {};
+  if(!state.npcBondRoute) state.npcBondRoute = {};
+  for(const n of NPCS){
+    if(!(n.id in state.npcAffinity)) state.npcAffinity[n.id] = 0;
+  }
+}
+function npcNameShort(n){
+  return (n.name || "").split(" / ")[0] || n.id;
+}
+function getNpcById(id){
+  return NPCS.find(n=>n.id===id) || null;
+}
+function npcBondFlavor(n){
+  const route = state.npcBondRoute && state.npcBondRoute[n.id];
+  if(route==="romance"){
+    return "你们现在会在路过彼此时，用那种只有你们懂的眼神点头。";
+  }
+  if(route==="bestie"){
+    return "你们已经是挚友了。就算不说话，也知道彼此今天撑不撑得住。";
+  }
+  return null;
+}
+function adjustNpcAffinity(npcId, fnTag, group){
+  if(!npcId || !fnTag || fnTag==="--") return;
+  ensureNpcSocialState();
+  const n = getNpcById(npcId);
+  if(!n) return;
+  let delta = 0;
+  if((n.likes||[]).includes(fnTag)) delta += 2;
+  if((n.dislikes||[]).includes(fnTag)) delta -= 2;
+  if(group==="shadow") delta -= 1;
+  const route = state.npcBondRoute[npcId];
+  if(route==="romance" && ["Fi","Fe","Ne"].includes(fnTag)) delta += 1;
+  if(route==="bestie" && ["Fe","Si","Te"].includes(fnTag)) delta += 1;
+  if(delta===0) return;
+  const oldV = state.npcAffinity[npcId] || 0;
+  const nowV = clamp(oldV + delta, 0, 50);
+  state.npcAffinity[npcId] = nowV;
+  const sign = nowV-oldV >= 0 ? "+" : "";
+  showToast(npcNameShort(n)+" 好感 " + sign + (nowV-oldV) + " · " + nowV + "/50", "note");
+  if(oldV < 40 && nowV >= 40 && !state.flags["bond_unlock_"+npcId]){
+    state.flags["bond_unlock_"+npcId] = true;
+    showToast(npcNameShort(n)+"：好感达到 40，可选浪漫或挚友线", "achv");
+  }
+}
+
+/* NPC chat gating: one talk per hour per NPC */
+function talkTo(n){
+  ensureNpcSocialState();
+  if(state.npcLastHour[n.id] === state.hour && state.npcLastHour[n.id] !== undefined){
+    showToast("（"+n.name.split(" / ")[0]+"已经说过话了。）");
+    return;
+  }
+  state.npcLastHour[n.id] = state.hour;
+  state.talkingNpcId = n.id;
+  if(n.mbti) showToast(npcNameShort(n) + " · MBTI " + n.mbti, "note");
+  /* day 1 9:00 first chat with 田 = intro question */
+  if(n.id==="tian" && !state.flags.tianAsked){
+    state.flags.tianAsked = true;
+    runScene(introTianScene());
+    return;
+  }
+  const favor = state.npcAffinity[n.id] || 0;
+  if(favor >= 40 && !state.npcBondRoute[n.id]){
+    const base = npcDialog(n);
+    runScene([
+      {type:"say", name:n.name,
+        text:"（你们之间已经不是普通同事了。好感 "+favor+"/50。）"},
+      {type:"choice", name:n.name, prompt:"你想把关系带到哪里？", options8:{
+        Fi:{ text:"进入浪漫剧情（不分性别）", fn:()=>{
+          inject([{type:"say", name:n.name, text:"行。\n那我们就离谱一点。\n下次一起在会议室偷写情书。"}]);
+          state.npcBondRoute[n.id] = "romance";
+        }},
+        Fe:{ text:"成为挚友（革命友谊）", fn:()=>{
+          inject([{type:"say", name:n.name, text:"好。\n从今天起你崩溃我递纸，你加班我递咖啡。"}]);
+          state.npcBondRoute[n.id] = "bestie";
+        }},
+        Ti:{ text:"先保持同事关系", fn:()=>{
+          inject([{type:"say", name:n.name, text:"行。\n我们先把今天活完。"}]);
+        }},
+      }},
+      ...base,
+    ]);
+    return;
+  }
+  const base = npcDialog(n);
+  const bond = npcBondFlavor(n);
+  runScene(bond ? [{type:"say", name:n.name, text:bond}, ...base] : base);
+}
+
+/* ===================== INTRO ===================== */
+function introTianScene(){
+  return [
+    {type:"say", name:"田 / 二游老兵",
+      text:"……诶？"},
+    {type:"say", name:"田 / 二游老兵",
+      text:"你怎么会在男睡眠仓？"},
+    {type:"say", name:"*",
+      text:"你愣了一下。\n你试图想自己昨晚是怎么进去的。\n你没想起来。"},
+    {type:"choice", name:"田 / 二游老兵",
+      prompt:"\"你……是不是走错了？\"",
+      options8:{
+        Te:{ text:"\"我没注意标志。下次会看的。\"", fn:()=>{
+          inject([
+            {type:"say", name:"田",
+              text:"……行吧。\n你看上去就像没睡醒。\n下午别迟到，14:00 [[需求评审]]。"},
+            {type:"act", fn:()=>{ unlockJargon("需求评审"); discoverSchedule(e=>e.day===1 && e.category==="work"); }},
+          ]);
+        }},
+        Fi:{ text:"\"……我也想问这个问题。\"", fn:()=>{
+          inject([
+            {type:"say", name:"田",
+              text:"…………\n（"+pronoun()+"看着你，没说话。）\n回头吧。"},
+            {type:"act", fn:()=>{ recordMemory("男睡眠仓 · 你不知道为什么"); }},
+          ]);
+        }},
+        Ti:{ text:"\"睡眠仓也分性别？这都 2026 年了。\"", fn:()=>{
+          inject([
+            {type:"say", name:"田",
+              text:"……呃。\n按"+COMPANY_NAME+"规定。\nHR 上次在群里发过通知。\n你可能没看。"},
+            {type:"act", fn:()=>{ unlockJargon("HR"); }},
+          ]);
+        }},
+        Ne:{ text:"\"也许这就是我不该在这里的征兆。\"", fn:()=>{
+          inject([
+            {type:"say", name:"田",
+              text:"……\n你这种话最近别在群里说。\n上面在裁员。"},
+            {type:"act", fn:()=>{ recordMemory("公司在裁员"); unlockJargon("N+1"); }},
+          ]);
+        }},
+      }},
+    {type:"say", name:"田",
+      text:"我先去工位了。\n你慢慢来。"},
+    {type:"act", fn:()=>{
+      /* 田 走开：从手动放置中移除 */
+      state.npcOverride = (state.npcOverride||[]).filter(o=>o.id!=="tian");
+    }},
+    {type:"say", name:"系统",
+      text:"你站在走廊里。\n你不太记得自己叫什么。\n你记得 9 点要打卡。\n你的本能在指挥身体往工位走。"},
+  ];
+}
+function inject(steps){
+  if(!scene){ runScene(steps); return; }
+  scene.splice(sceneIdx, 0, ...steps);
+}
+
+/* ===================== INTERACTIONS ===================== */
+function pronoun(){
+  /* 性别模糊 */
+  return ["Ta","Ta","他","她","你"][Math.floor(Math.random()*5)];
+}
+function selfPronoun(){
+  return ["你", "你这个人", "镜子里的人"][Math.floor(Math.random()*3)];
+}
+
+function interactDesk(){
+  state.computerSessionsToday++;
+  const first = (state.computerSessionsToday===1 && !state.flags.deskFirstDone);
+  const intro = [];
+  if(first){
+    state.flags.deskFirstDone = true;
+    intro.push(
+      {type:"say", name:"*",
+        text:"你在工位坐下。\n屏幕亮着，昨晚没关。\n\n你打开项目工程。\n7 天后要立项评审。\n你知道这个意味着什么。"},
+      /* v0.6: 工作行为不再解锁黑话 — 仅放一段记忆 */
+      {type:"act", fn:()=>{ recordMemory("项目还没立项"); }},
+    );
+  }
+  /* 项目状态摘要 */
+  const summaryLines = [];
+  for(const fn of FN_LIST){
+    const ph = state.project.phases[fn];
+    if(ph.progress > 0){
+      summaryLines.push("· " + PHASE_INFO[fn].name + "  +" + ph.progress + " 格");
+    }
+  }
+  const summary = summaryLines.length
+    ? "项目进度：" + state.project.progress + " / 28 格\n" + summaryLines.join("\n")
+    : "项目进度：0 / 28 格\n（什么都还没开始。）";
+  const anxietyLine = state.anxietyActive
+    ? "\n\n你的焦虑还没退。日期在屏幕角落里偶尔会自己跳。"
+    : "";
+
+  intro.push(
+    {type:"say", name:"* 工位", text: summary + anxietyLine + "\n\n你今天准备做哪一段？"},
+    workChoiceStep(),
+  );
+  runScene(intro);
+}
+
+/* 同事工位 — 不消耗时间，给一段感悟或八卦，偶尔解锁黑话 */
+function interactColleagueDesk(x, y){
+  const owner = DESK_OWNERS[x+","+y];
+  if(!owner){
+    runScene([{type:"say", name:"* 工位", text:"这个工位的主人最近从没坐过。\n键盘上有一根头发，颜色不像你。"}]);
+    return;
+  }
+  if(owner.status === "active"){
+    runScene([
+      {type:"say", name:"* "+owner.name+" 的工位", text: owner.blurb},
+      {type:"act", fn:()=>{
+        if(owner.id==="lin")   unlockJargon("白盒");
+        if(owner.id==="zheye") unlockJargon("Crunch");
+        if(owner.id==="yusha") unlockJargon("GameJam");
+      }},
+    ]);
+    return;
+  }
+  if(owner.status === "quit"){
+    runScene([
+      {type:"say", name:"* 已离职 · 工位",
+       text: owner.blurb},
+      {type:"choice", name:"* 已离职 · 工位",
+        prompt:"你在抽屉里翻了翻。", options8:{
+          Si:{ text:"\"我记得 Ta 上一次说过\"", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"你想起 Ta 离开前的最后一句话。\n\"我以为做游戏是做我喜欢的东西。\n后来发现是做老板喜欢的。\""},
+              {type:"act", fn:()=>{ unlockJargon("跳板"); recordMemory("有人离开过这里"); }},
+            ]);
+          }},
+          Fi:{ text:"什么都不做，坐了一会儿", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"工位的椅子比你的软。\n你坐了三分钟。\n你站起来。"},
+              {type:"act", fn:()=>{ recordMemory("空工位的余温"); }},
+            ]);
+          }},
+          Ne:{ text:"猜 Ta 现在在哪里", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"杭州？\n墨尔本？\n回老家了？\n开店了？\n\n你也不知道。"},
+            ]);
+          }},
+          Te:{ text:"看抽屉里有没有有用的东西", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"半盒口香糖。\n一张过期工牌。\n一张写着「项目复盘 v3 (重写)」的便签。"},
+              {type:"act", fn:()=>{ unlockJargon("返工"); }},
+            ]);
+          }},
+        }},
+    ]);
+    return;
+  }
+  if(owner.status === "fired"){
+    runScene([
+      {type:"say", name:"* 已被辞退 · 工位",
+       text: owner.blurb},
+      {type:"choice", name:"* 已被辞退 · 工位",
+        prompt:"这个工位上次有人坐，是上周。", options8:{
+          Fe:{ text:"心里替 Ta 难过一下", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"你想起 Ta 被叫进会议室那天的眼神。\nTa 出来时手里拿着一个纸箱。\n大家都没看 Ta。"},
+              {type:"act", fn:()=>{ maybeEnterDepressed(0.3); recordMemory("有人被裁了"); addKeyword("裁员"); }},
+            ]);
+          }},
+          Te:{ text:"\"Ta 是哪个项目的？\"", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"Ta 是上一个项目的。\n那个项目两个月前 [[N+1]] 解散了。\nTa 没等到下一个项目立项。"},
+              {type:"act", fn:()=>{ unlockJargon("N+1"); }},
+            ]);
+          }},
+          Ni:{ text:"\"我会不会是下一个？\"", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"你想了一下。\n答案不是\"不会\"。\n答案是\"也许\"。"},
+              {type:"act", fn:()=>{ maybeEnterDepressed(0.4); }},
+            ]);
+          }},
+          Si:{ text:"读那张便签：\"下个项目就好了\"", fn:()=>{
+            inject([
+              {type:"say", name:"*",
+                text:"GZ 写的便签，已经褪色。\n\"下个项目就好了。\"\n你想哭。"},
+              {type:"act", fn:()=>{ recordMemory("下个项目永远在下个项目"); }},
+            ]);
+          }},
+        }},
+    ]);
+    return;
+  }
+}
+
+function workChoiceStep(){
+  const extra = [];
+  if(state.anxietyActive){
+    extra.push({
+      text:"!!! 焦虑状态 · 对着日期反复刷新（特殊）",
+      fn:()=>{
+        inject([
+          {type:"say", name:"* 工位",
+            text:"你盯着系统右上角的日期。\nDAY 2 / DAY 6 / DAY 4 / DAY ?\n你分不清哪一个是真的。"},
+          {type:"act", fn:()=>{
+            advanceMinutes(30);
+            addKeyword("焦虑");
+            boostZeroSum("Ni", 3);
+            maybeEnterDepressed(0.2);
+          }},
+        ]);
+      }
+    });
+  }
+  return {
+    type:"choice", name:"* 工位 · 项目 · 选择一个开发环节", showAll8:true,
+    prompt:"（每一段都对应一种你性格里的功能。\n你越擅长，成功率越高。\n但每次成长都会让对位的功能萎缩。）",
+    options8:{
+      Ne:{ text: TASK_INFO.Ne.label + workHint("Ne"), fn:()=>inject([workDirectionChoiceStep("Ne")]) },
+      Ni:{ text: TASK_INFO.Ni.label + workHint("Ni"), fn:()=>inject([workDirectionChoiceStep("Ni")]) },
+      Ti:{ text: TASK_INFO.Ti.label + workHint("Ti"), fn:()=>inject([workDirectionChoiceStep("Ti")]) },
+      Fi:{ text: TASK_INFO.Fi.label + workHint("Fi"), fn:()=>inject([workDirectionChoiceStep("Fi")]) },
+      Te:{ text: TASK_INFO.Te.label + workHint("Te"), fn:()=>inject([workDirectionChoiceStep("Te")]) },
+      Si:{ text: TASK_INFO.Si.label + workHint("Si"), fn:()=>inject([workDirectionChoiceStep("Si")]) },
+      Se:{ text: TASK_INFO.Se.label + workHint("Se"), fn:()=>inject([workDirectionChoiceStep("Se")]) },
+      Fe:{ text: TASK_INFO.Fe.label + workHint("Fe"), fn:()=>inject([workDirectionChoiceStep("Fe")]) },
+      _plain:[
+        { text:"× 不做项目了 · 看一眼招聘软件就走", fn:()=>{
+          const co = ["鹰甲","麦穗","百合丝","折纸","悠心","沐目","蛮啾","夜莺"];
+          const c = co[Math.floor(Math.random()*co.length)];
+          inject([
+            {type:"say", name:"*",
+              text:"你更新了简历。\n" + c + " 的 HR 主动打了招呼。\n你在窗口前坐了五分钟。\n你关掉了。"},
+            {type:"act", fn:()=>{ unlockJargon("内推"); recordMemory("自己曾经想跳"); }},
+          ]);
+        }},
+        ...extra,
+      ],
+    }
+  };
+}
+function workDirectionChoiceStep(fn){
+  const dirs = WORK_DIRECTIONS[fn] || ["默认方向"];
+  return {
+    type:"choice", name:"* 工位 · 二级方向",
+    prompt:"你打算把这一段做成什么方向？",
+    options8:{
+      _plain:[
+        ...dirs.map(d=>({ text:d, fn:()=>doWork(fn, d) })),
+        { text:"返回上一级", fn:()=>inject([workChoiceStep()]) },
+      ]
+    }
+  };
+}
+function workHint(fn){
+  /* 给玩家展示一个粗略的"擅长程度"，但不显示具体数值/概率 */
+  const v = state.functions[fn] || 0;
+  let star;
+  if(v >= 100) star = "★★★";
+  else if(v >= 65) star = "★★";
+  else if(v >= 35) star = "★";
+  else star = "—";
+  const ph = state.project.phases[fn];
+  const cap = (ph.progress >= ph.max - 1) ? "（已快饱和）" : "";
+  return "  " + star + cap;
+}
+
+function interactMeetingTable(){
+  discoverSchedule(e=>e.day===state.day && e.category==="boss");
+  runScene([
+    {type:"say", name:"主管 G",
+      text:"人都到齐了。\n关于这个版本的 [[KPI]]…\n我们需要聊一聊。\n上面也在听。"},
+    {type:"act", fn:()=>{ unlockJargon("KPI"); }},
+    {type:"say", name:"主管 G",
+      text:"这次的对齐会要开很久。\n谁先发言？"},
+    {type:"choice", name:"* 月度对齐会  ·  4 小时",
+      prompt:"全场目光在你身上。", options8:{
+        Te:{ text:"亮出三组数据，把责任推给上游", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你把数据列得清清楚楚。\n会议室安静了三秒。\n然后吵起来——但不是吵你。"},
+            {type:"act", fn:()=>{ advanceMinutes(240); unlockJargon("OKR"); unlockJargon("流水"); }},
+          ]);
+        }},
+        Ti:{ text:"指出指标本身的逻辑问题", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你指出整个 [[KPI]] 体系都在循环论证。\n你说得对。\n但没人想被你说对。"},
+            {type:"act", fn:()=>{ advanceMinutes(240); unlockJargon("OKR"); maybeEnterDepressed(0.40); }},
+          ]);
+        }},
+        Fi:{ text:"\"这不是我想做的游戏。\"", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你说出口的瞬间，自己也愣了一下。\n空气瞬间变厚。"},
+            {type:"say", name:"主管 G",
+              text:"……我知道。\n但你想做的那个，"+COMPANY_NAME+"养不起。"},
+            {type:"act", fn:()=>{
+              addKeyword("自我实现");
+              state.flags.indieSpark=(state.flags.indieSpark||0)+1;
+              advanceMinutes(240);
+              recordMemory("自己想做的游戏");
+              maybeEnterDepressed(0.50);
+            }},
+          ]);
+        }},
+        Fe:{ text:"先为大家的辛苦背书，再缓和气氛", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你说\"大家这个月都很辛苦\"。\n几个人点头。\n气氛缓了一点。"},
+            {type:"act", fn:()=>{ advanceMinutes(240); }},
+          ]);
+        }},
+        /* shadow */
+        Ni:{ text:"沉默地看穿。这个会议早就有结论。", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你看穿了。\n但你什么都没说。\n四个小时的发言里，你只说了\"嗯\"。"},
+            {type:"act", fn:()=>{ advanceMinutes(240); }},
+          ]);
+        }},
+        Ne:{ text:"提一个完全没人想到的方向", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你提了一个新方向。\n大家愣了一下。\n主管说：\"这个我们后面单聊。\""},
+            {type:"act", fn:()=>{ advanceMinutes(240); unlockJargon("立项"); }},
+          ]);
+        }},
+        Si:{ text:"\"以前我们不是这么干的\"", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你提到了去年的版本。\n会议室里有几个人沉默了。\n他们也记得。"},
+            {type:"act", fn:()=>{ advanceMinutes(240); unlockJargon("长青"); recordMemory("去年的项目"); }},
+          ]);
+        }},
+        Se:{ text:"打个直接的比喻，让会议室笑出来", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你说了一句脏话级别的比喻。\n会议室笑了。\n主管也笑了。\n但事情没解决。"},
+            {type:"act", fn:()=>{ advanceMinutes(240); }},
+          ]);
+        }},
+      }},
+    {type:"say", name:"系统",
+      text:"会议结束。\n你出来的时候，外面的天已经黄了。"},
+  ]);
+}
+
+function interactSleepPod(side){
+  state.sleepPodToday++;
+  /* v0.6 起，男女睡眠仓功能完全一致；
+     仅当你进入"另一边"时多一段 flavor，
+     凸显主角不知道自己究竟该归属哪一边 */
+  const female = (side==="F");
+  const podLabel = female ? "* 女睡眠仓" : "* 男睡眠仓";
+  const podMark  = female ? "「♀」" : "「♂」";
+  const flavorIntro = female
+    ? "舱壳上贴着「♀」。\n你站在外面，没人来拦你。\n你也不知道你是不是\"应该\"进。"
+    : "舱壳上贴着「♂」。\n这是你今天早上爬出来的那一个。";
+  if(female && !state.flags.femalePodFirst){
+    state.flags.femalePodFirst = true;
+    recordMemory("第一次走进了「♀」的那一边");
+  }
+  runScene([
+    {type:"say", name:"*", text: flavorIntro},
+    {type:"choice", name: podLabel,
+      prompt: female
+        ? "你站在了「另一边」。\n谁都没回头。"
+        : "躺一下，时间会过得很快。", options8:{
+        Si:{ text: state.hour>=18 ? "在公司过夜（结束今天）" : "钻进去睡 1.5 小时", fn:()=>{
+          if(state.hour >= 18){
+            inject([
+              {type:"say", name:"*",
+                text:"你拉上舱门。\n你今天不打算回家了。\n（——下一次睁眼，是明天早上。——）"},
+              {type:"act", fn:()=>{ endOfDay("slept"); }},
+            ]);
+          } else {
+            inject([
+              {type:"say", name:"*",
+                text:"你拉上舱门。\n（——你没有做梦。——）\n醒来时，时间过去了一个半小时。"},
+              {type:"act", fn:()=>{
+                advanceMinutes(90);
+                if(state.sleepPodToday>=2 && Math.random()<0.6) setState("hallu", 4);
+                recordMemory("睡眠仓里的低频蜂鸣");
+              }},
+            ]);
+          }
+        }},
+        Ni:{ text:"看着舱门发呆", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"睡眠仓的反光里有一张脸。\n那不太像你的脸。\n也不完全是别人的。"},
+            {type:"act", fn:()=>{ addKeyword("模糊"); }},
+          ]);
+        }},
+        Fi:{ text:"在舱里偷偷哭一会儿", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你拉上舱门。\n出来的时候，眼睛还是红的。\n但没人会问。"},
+            {type:"act", fn:()=>{ advanceMinutes(30); recordMemory("自己其实想哭很久了"); }},
+          ]);
+        }},
+        Te:{ text:"算一算今天的进度，决定要不要睡", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你算了一下。\n时间不允许。\n你走开了。"}]);
+        }},
+        /* shadow */
+        Ne:{ text:"把睡眠仓当成飞船，幻想自己在去某处", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你在脑子里，已经离开了这层楼。\n离开了这栋楼。\n离开了宜山路。"},
+            {type:"act", fn:()=>{ state.flags.indieSpark=(state.flags.indieSpark||0)+1; advanceMinutes(60); }},
+          ]);
+        }},
+        Se:{ text:"算了，下楼抽根烟", fn:()=>{
+          inject([{type:"say", name:"*", text:"你转身走开。\n睡眠仓重新关上灯。"}]);
+        }},
+        Ti:{ text:"研究睡眠仓的结构与噪音规律", fn:()=>{
+          inject([{type:"say", name:"*", text:"你贴着舱壳听。\n压缩机的频率是稳定的。\n只是没人能修。"}]);
+        }},
+        Fe:{ text:"让位给看起来更累的同事", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你后退一步。\n真的有人走过来。\n"+pronoun()+"什么都没说，钻进去了。"},
+          ]);
+        }},
+      }},
+  ]);
+}
+
+function interactCoffee(){
+  state.coffeeToday++;
+  let lines, after;
+  if(state.coffeeToday<=2){
+    lines = "你接了一杯美式。\n免费的。不好喝，但够苦。";
+    after = ()=>{};
+  } else if(state.coffeeToday<=4){
+    lines = "第 "+state.coffeeToday+" 杯。\n心开始跳得快。\n群里有人在刷\"急\"。";
+    after = ()=>{ unlockJargon("Crunch"); };
+  } else {
+    lines = "第 "+state.coffeeToday+" 杯。\n手有点抖。\n你听见自己的牙齿在轻轻打颤。";
+    after = ()=>{ if(!state.specialState) setState("manic", 3); };
+  }
+  runScene([
+    {type:"say", name:"*", text: lines},
+    {type:"act", fn: after},
+  ]);
+}
+
+function interactPrinter(){
+  runScene([
+    {type:"say", name:"*",
+      text:"打印机在嗡嗡响，但没吐出任何东西。\n进纸盒是空的。"},
+    {type:"say", name:"*",
+      text:"旁边贴着一张便签：\n「请不要打印个人独立游戏海报。 —— [[HR]]」\n字被人用马克笔加粗过两遍。"},
+    {type:"act", fn:()=>{
+      addKeyword("独立游戏");
+      state.flags.indieSpark=(state.flags.indieSpark||0)+1;
+      recordMemory("自己想做的游戏");
+    }},
+  ]);
+}
+
+function interactBoard(){
+  runScene([
+    {type:"say", name:"*",
+      text:"白板上：\n· 版本 3.2 [[DDL]] —— 下周五\n· 月度对齐会 —— 周三 15:00\n· 美术大返工 —— 周四 14:00"},
+    {type:"act", fn:()=>{
+      unlockJargon("DDL");
+      discoverSchedule(e=>e.day===3 && e.category==="boss");
+      discoverSchedule(e=>e.day===4 && e.category==="work");
+      discoverSchedule(e=>e.day===1 && e.category==="work");
+    }},
+    {type:"say", name:"*",
+      text:"最底下一行被人用红笔写：\n「[[西西弗斯]] 推石头。」\n字被擦过，又重新描了一遍。"},
+    {type:"act", fn:()=>{ unlockJargon("西西弗斯"); }},
+  ]);
+}
+
+function interactMirror(){
+  /* 长发 / 性别模糊 / 1996 */
+  const lines = [
+    "镜子里的脸你有时认得，有时不认得。\n今天的你像别人。",
+    "你不确定该用「他」「她」还是「Ta」来指自己。\n你决定先不确定。",
+    "镜子里的人长发披到锁骨。\n比你想的还要更长一点。",
+    "你下意识用手拨头发。\n镜子里的人也拨了。\n你确认了那是你。",
+    "你今年应该是 30 出头。\n1996 年生。\n你不太确定。",
+    "你看了一眼自己。\n你想起小时候在 [[CCG]] 频道看动画片。\n那时候你想做这种东西。",
+  ];
+  const i = Math.floor(Math.random()*lines.length);
+  runScene([
+    {type:"say", name:"*", text: lines[i]},
+    {type:"act", fn:()=>{
+      addKeyword("模糊");
+      if(i===4) recordMemory("你 1996 年生");
+      if(i===5){ recordMemory("小时候看的动画片"); unlockJargon("CCG"); }
+      if(i===2 || i===3) recordMemory("你的长发");
+    }},
+  ]);
+}
+
+function interactWindow(){
+  runScene([
+    {type:"say", name:"*",
+      text:"窗外是宜山路。\n2026 年的天色，看上去和 2016 年差不多。\n再远一点是虹桥机场，傍晚能看到飞机在落日里起飞。"},
+    {type:"say", name:"*",
+      text:"你想起来——\n你的工位曾经也能看到这个方向。"},
+    {type:"act", fn:()=>{ addKeyword("落日"); recordMemory("以前能看见落日的工位"); }},
+  ]);
+}
+
+const ELEVATOR_AFTERWORK_POOL = [
+  { id:"live", text:"今晚去 livehouse", mode:"live" },
+  { id:"arcade", text:"今晚去机厅打节奏游戏", mode:"arcade" },
+  { id:"ramen", text:"今晚去吃一碗超咸豚骨面", mode:"ramen" },
+  { id:"park", text:"今晚沿高架下夜跑 4 公里", mode:"park" },
+];
+function pickAfterworkEvent(){
+  const used = state.elevatorAfterworkUsed || {};
+  const remain = ELEVATOR_AFTERWORK_POOL.filter(e=>!used[e.id]);
+  if(!remain.length) return ELEVATOR_AFTERWORK_POOL[0];
+  return remain[Math.floor(Math.random()*remain.length)];
+}
+
+function interactElevator(){
+  /* v0.6: 电梯既是下班窗口，也是楼层切换 */
+  const fl = currentRoom().floor;
+  /* 楼层导航选项（_plain，按楼层动态生成） */
+  const navOpts = [];
+  if(fl !== 2) navOpts.push({ text:"≡ 前往  F2 · 工区楼层", fn:()=>{
+    elevatorRideTo("elevator_2f", 5, 4);
+  }});
+  if(fl !== 1) navOpts.push({ text:"≡ 前往  F1 · 大堂", fn:()=>{
+    elevatorRideTo("lobby", 6, 4);
+  }});
+  if(fl !== 9) navOpts.push({ text:"≡ 前往  楼顶天台", fn:()=>{
+    elevatorRideTo("rooftop", 6, 5);
+  }});
+
+  if(state.canEndDay && state.hour >= 18){
+    const afterworkEvent = pickAfterworkEvent();
+    runScene([
+      {type:"say", name:"*",
+        text:"电梯亮着。\n下班点已经过了。"},
+      {type:"choice", name:"* 电梯  ·  下班窗口", showAll8:true,
+        prompt:"今天到此为止；或者去别的楼层。", options8:{
+          Te:{ text:"按下去 · 准时走人", fn:()=>{ endDayByLeaving("walk"); }},
+          Fi:{ text:"按下去 · \"今天就让它结束吧\"", fn:()=>{ endDayByLeaving("soft"); }},
+          Se:{ text:"快步进电梯", fn:()=>{ endDayByLeaving("walk"); }},
+          Si:{ text:"和准时下班的同事一起走", fn:()=>{ endDayByLeaving("walk"); }},
+          Ne:{ text:"\""+afterworkEvent.text+"。\"", fn:()=>{
+            state.elevatorAfterworkUsed[afterworkEvent.id] = true;
+            endDayByLeaving(afterworkEvent.mode);
+          }},
+          Ni:{ text:"\"再回工位看一眼，我心里有数了。\"", fn:()=>{
+            inject([{type:"say", name:"*",
+              text:"你转身。\n回工位的脚步比你想的还要犹豫。"}]);
+          }},
+          Ti:{ text:"算一下加班 1 小时的边际收益", fn:()=>{
+            inject([{type:"say", name:"*",
+              text:"算了一下：\n再做一小时项目，进度大约 +1 格。\n再做一小时疲劳，类型乱跳。"}]);
+          }},
+          Fe:{ text:"\"还有人在加班，我不好意思走。\"", fn:()=>{
+            inject([{type:"say", name:"*",
+              text:"你环顾。\n没人看你。\n但你还是回了工位。"}]);
+          }},
+          _plain: navOpts,
+        }},
+    ]);
+    return;
+  }
+  /* 18:00 之前 = 楼层切换 + 弃岗 */
+  runScene([
+    {type:"say", name:"*",
+      text:"电梯厅。按钮亮着。\n现在还不到下班点。"},
+    {type:"choice", name:"* 电梯", showAll8:true,
+      prompt:"去哪里？", options8:{
+        Te:{ text:"× 弃工 · 直接走人，今天不干了", fn:()=>{ triggerEnding("escape_quit"); }},
+        Fi:{ text:"× \"我做不下去了\" · 弃工", fn:()=>{ triggerEnding("escape_quit"); }},
+        Ni:{ text:"看着按钮，知道按下去等于什么", fn:()=>{
+          inject([{type:"say", name:"*",
+            text:"你看着按钮。\n按下去等于今天结束。\n不按等于今天还没结束。"}]);
+        }},
+        Si:{ text:"想起每天都站在这里的自己", fn:()=>{
+          inject([{type:"say", name:"*",
+            text:"你站在这里几百次了。\n按和不按都站过。"}]);
+        }},
+        _plain: navOpts,
+      }},
+  ]);
+}
+
+function elevatorRideTo(roomId, x, y){
+  /* 偶尔在电梯里偷听同事八卦 */
+  const overheard = [
+    "电梯里有两个穿黑色卫衣的人。\n\"上面又改 [[OKR]] 了。\"\n\"第几次了？\"\n\"我数不过来。\"",
+    "电梯里只有你。\n屏幕在放某个手游的广告。\n[[首日]] 流水已经写在标题上。",
+    "进来一个 [[35 岁]] 上下的男人。\n他没看你。\n他在听耳机。\n你瞄了一眼——他在听 [[Vtuber]] 切片。",
+    "电梯里有个穿打底衫的女生。\n\"我推今天 [[毕业]]了。\"\n\"……节哀。\"\n你忍住没插嘴。",
+    "电梯门关上的瞬间，\n两个人停止了对话。\n你猜你是被防备的那一种人。",
+  ];
+  const enc = Math.random() < 0.45 ? overheard[Math.floor(Math.random()*overheard.length)] : null;
+  if(enc){
+    runScene([
+      {type:"say", name:"* 电梯", text: enc},
+      {type:"act", fn:()=>{
+        /* 偷听就解锁一些黑话 */
+        const all = ["OKR","首日","35 岁","Vtuber","毕业","切片"];
+        all.forEach(j => { if(Math.random() < 0.4) unlockJargon(j); });
+        changeRoom(roomId, x, y);
+      }},
+    ]);
+  } else {
+    changeRoom(roomId, x, y);
+  }
+}
+function endDayByLeaving(mode){
+  const lines = {
+    walk: "你下楼。\n外面是宜山路。\n地铁口的光亮着。",
+    soft: "你下楼。\n地铁还没到末班。\n你站在月台上很久。",
+    live: "你下楼，叫了打车去 livehouse。\n你这周第一次听到自己想听的东西。",
+    arcade: "你下楼去了机厅。\n鼓点把今天的会议声盖住了。\n你终于能呼吸。",
+    ramen: "你下楼拐进小巷。\n一碗豚骨面咸得离谱。\n你把汤喝光了。",
+    park: "你沿着高架下面一路跑。\n跑到汗把焦虑从耳朵里冲出去一点。",
+  };
+  runScene([
+    {type:"say", name:"系统",
+      text: lines[mode] || lines.walk},
+    {type:"act", fn:()=>{ endOfDay("left"); }},
+  ]);
+}
+
+/* ========== 新交互（v0.6） ========== */
+
+/* 沙发 / 上网冲浪 — 消遣行为，消耗 30min，但可解锁二次元黑话 */
+function interactSofaForum(){
+  runScene([
+    {type:"say", name:"* 沙发", text:"你瘫进沙发，掏出手机。\n茶水间没人。"},
+    {type:"choice", name:"* 上网冲浪",
+      prompt:"刷点什么？", options8:{
+        Ne:{ text:"刷 b 站推荐", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"首页上是个 [[Vtuber]]在唱 [[BOCCHI]] 的 op。\n弹幕里全是 \"切片做得好\"。\n你一边刷一边觉得自己应该回工位。"},
+            {type:"act", fn:()=>{
+              unlockJargon("Vtuber"); unlockJargon("切片");
+              unlockJargon("弹幕"); unlockJargon("BOCCHI");
+              advanceMinutes(30);
+            }},
+          ]);
+        }},
+        Ni:{ text:"刷小红书", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"\"30 岁还在做 [[二游]] 是什么感受。\"\n\"这一片 [[35 岁]] 程序员的真实工资。\"\n\"我裸辞做 vtuber 的第 80 天。\"\n你点了进去。\n你又点了出来。"},
+            {type:"act", fn:()=>{
+              unlockJargon("Vtuber"); unlockJargon("35 岁"); unlockJargon("小红书");
+              advanceMinutes(30);
+              if(Math.random() < 0.3) maybeEnterDepressed(0.5);
+            }},
+          ]);
+        }},
+        Te:{ text:"看招聘软件", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"看了三页都是 [[二游]] 主策。\nJD 里全是 [[KPI]][[流水]][[首日]][[长青]]。\n你关掉了。"},
+            {type:"act", fn:()=>{
+              unlockJargon("KPI"); unlockJargon("流水"); unlockJargon("长青");
+              advanceMinutes(30);
+            }},
+          ]);
+        }},
+        Fi:{ text:"刷自己关注的小偶像", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"染织今天的直播是粉色的。\n弹幕里有人 [[SC]] 了一个 \"加油\"。\n你也想 SC，你没有 SC。"},
+            {type:"act", fn:()=>{
+              unlockJargon("SC"); unlockJargon("直播"); unlockJargon("一推");
+              advanceMinutes(30);
+              state.flags.indieSpark = (state.flags.indieSpark||0) + 1;
+            }},
+          ]);
+        }},
+        Se:{ text:"刷抖音", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"前 5 个视频是 \"IT 园区员工真实午饭\"。\n第 6 个是 vtuber [[毕业]]视频。\n第 7 个你忘了。"},
+            {type:"act", fn:()=>{
+              unlockJargon("抖音"); unlockJargon("毕业"); unlockJargon("中之人");
+              advanceMinutes(30);
+            }},
+          ]);
+        }},
+        Ti:{ text:"上 NGA / 即刻", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"二游讨论区在吵 \"养成是不是 [[CCG]]\"。\n楼下两个人在吵 \"vtuber [[切片]]违不违法\"。\n你看了一会儿，没参与。"},
+            {type:"act", fn:()=>{
+              unlockJargon("CCG"); unlockJargon("切片"); unlockJargon("即刻");
+              advanceMinutes(30);
+            }},
+          ]);
+        }},
+        Fe:{ text:"看朋友圈", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"前同事在杭州转行做开播培训。\n大学同学在北京升 P7。\n你点赞一个，没评论。"},
+            {type:"act", fn:()=>{
+              unlockJargon("P7"); unlockJargon("开播");
+              advanceMinutes(30);
+            }},
+          ]);
+        }},
+        Si:{ text:"什么都不刷，就坐着", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你看着手机黑屏。\n屏幕里有你的脸。\n你也不太认得。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(30);
+              recordMemory("发呆 30 分钟");
+            }},
+          ]);
+        }},
+      }},
+  ]);
+}
+
+/* 留言板 / 公告板 — 不消耗时间，解锁公司黑话 */
+function interactNoticeBoard(){
+  const pool = [
+    { line:"《本月项目 [[OKR]] 复盘 · 11/30 前提交》\n红字：「请在 [[DDL]] 前完成」", j:["OKR","DDL"] },
+    { line:"《关于推动 [[长青]] 项目的指导意见》\n上面用红笔圈了「[[首日]] 不能掉」。", j:["长青","首日"] },
+    { line:"前台姐姐贴的告示：\n「电梯将于本周日 14:00 [[Crunch]] 维护，敬请配合。」\n你笑了一下。", j:["Crunch"] },
+    { line:"前同事临走前贴的：\n\"做不动了。下家见。\"\n旁边有人写：\"+1\"\n再旁边：\"+2\"\n再旁边：\"[[N+1]]?\"", j:["N+1"] },
+  ];
+  const e = pool[Math.floor(Math.random()*pool.length)];
+  runScene([
+    {type:"say", name:"* 留言板", text: e.line},
+    {type:"act", fn:()=>{ e.j.forEach(j => unlockJargon(j)); }},
+  ]);
+}
+
+function interactToilet(){
+  runScene([
+    {type:"say", name:"*",
+     text:"你站在马桶旁。\n墙上的瓷砖是奶油色的。\n你不太想说话。"},
+    {type:"choice", name:"* 卫生间",
+      prompt:"做什么？", options8:{
+        Si:{ text:"洗一把脸", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"水是凉的。\n你抬头看了一眼镜子。\n你看上去比早上更像\"成年人\"了一点。"},
+            {type:"act", fn:()=>{ recordMemory("把自己洗成成年人的样子"); }},
+          ]);
+        }},
+        Fi:{ text:"在隔间里坐了五分钟", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"你没有上厕所。\n你只是想找一个没人能找到你的位置。"},
+            {type:"act", fn:()=>{ recordMemory("在卫生间躲过一次"); }},
+          ]);
+        }},
+        Te:{ text:"算了，回工位", fn:()=>{
+          inject([{type:"say", name:"*", text:"你转身。\n没人注意到你刚刚消失了一会儿。"}]);
+        }},
+      }},
+  ]);
+}
+
+function interactGym(){
+  runScene([
+    {type:"say", name:"*",
+      text:"健身房没什么人。\n跑步机在那里，灯亮着。"},
+    {type:"choice", name:"* 健身房",
+      prompt:"你已经一周没动过了。", options8:{
+        Se:{ text:"跑 30 分钟", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你跑得很慢，但你跑完了。\n你出了汗。\n你的脑子里安静了一会儿。"},
+            {type:"act", fn:()=>{
+              advanceMinutes(45);
+              if(state.specialState && state.specialState.name==="depressed") clearState();
+              boostZeroSum("Se", 4);
+            }},
+          ]);
+        }},
+        Si:{ text:"在器械上坐着不动", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你坐了 10 分钟。\n你看了看天花板。\n回去了。"},
+            {type:"act", fn:()=>{ advanceMinutes(15); }},
+          ]);
+        }},
+        Te:{ text:"算了，没时间", fn:()=>{
+          inject([{type:"say", name:"*", text:"你转身走开。"}]);
+        }},
+      }},
+  ]);
+}
+
+function interactSmoke(){
+  runScene([
+    {type:"say", name:"*",
+      text:"楼外的吸烟区是这条路上最沉默的一小块。\n你看见三个公司的人，没人说话。\n空气里全是别人的烟。"},
+    {type:"choice", name:"* 吸烟区",
+      prompt:"你不抽烟。", options8:{
+        Ni:{ text:"听他们抱怨", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"\"做了 6 年 [[二游]] ，眼睛快瞎了。\"\n\"我们项目 [[首日]] 没保住。\"\n\"听说 [[N+1]] 要发了。\""},
+            {type:"act", fn:()=>{
+              unlockJargon("二游"); unlockJargon("首日"); unlockJargon("N+1");
+            }},
+          ]);
+        }},
+        Fi:{ text:"借一支烟，假装自己也是 \"行业老兵\"", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你接过烟，没点。\n你只是想站在那里像一个属于这里的人。"},
+            {type:"act", fn:()=>{ recordMemory("假装自己是行业老兵的那 5 分钟"); }},
+          ]);
+        }},
+        Ne:{ text:"突然想做一个 \"这条路众生相\" 的小游戏", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你脑子里立刻跑了一个 demo。\n2D 像素，没有战斗，只有对话。\n你掏出手机记下了一行字。"},
+            {type:"act", fn:()=>{
+              state.flags.indieSpark = (state.flags.indieSpark||0) + 2;
+              recordMemory("\"这条路\" 这个游戏的雏形");
+            }},
+          ]);
+        }},
+        Te:{ text:"看一眼时间，回去", fn:()=>{
+          inject([{type:"say", name:"*", text:"你转身。"}]);
+        }},
+      }},
+  ]);
+}
+
+function interactRailing(){
+  runScene([
+    {type:"say", name:"*",
+      text:"楼顶的风很大。\n虹桥机场方向有飞机起飞。\n你站在栏杆前。\n下面是宜山路。"},
+    {type:"choice", name:"* 楼顶 · 栏杆",
+      prompt:"你想到什么？", options8:{
+        Ni:{ text:"想到自己 30 岁了", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"30 岁。\n你一直以为 30 岁会是另一个样子。\n现在你知道，30 岁就是这个样子。"},
+            {type:"act", fn:()=>{ recordMemory("30 岁的那个晚上"); }},
+          ]);
+        }},
+        Ne:{ text:"想到自己一直没做的那个 demo", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"你看了一眼远处。\n那个 demo 你想了 4 年了。\n你今晚要不要打开 unity？"},
+            {type:"act", fn:()=>{
+              state.flags.indieSpark = (state.flags.indieSpark||0) + 2;
+              recordMemory("天台上的那个 demo");
+            }},
+          ]);
+        }},
+        Fi:{ text:"什么都不想，只是吹风", fn:()=>{
+          inject([
+            {type:"say", name:"*", text:"风很冷。\n你也很冷。\n但你想再站一会儿。"},
+            {type:"act", fn:()=>{
+              if(state.specialState && state.specialState.name==="depressed") clearState();
+            }},
+          ]);
+        }},
+        Se:{ text:"探头看下面", fn:()=>{
+          inject([
+            {type:"say", name:"*",
+              text:"……\n你退后了一步。\n你只是想看，并不真的想做。"},
+            {type:"act", fn:()=>{ recordMemory("天台上退后的那一步"); }},
+          ]);
+        }},
+      }},
+  ]);
+}
+
+function interactReception(){
+  runScene([
+    {type:"say", name:"前台 · 小李",
+      text:"哦，你啊。\n上来还是下楼？"},
+    {type:"choice", name:"前台 · 小李",
+      prompt:"小李没抬头，在抽屉里翻什么。", options8:{
+        Fe:{ text:"\"今天有快递吗？\"", fn:()=>{
+          inject([
+            {type:"say", name:"前台 · 小李",
+              text:"有。\n你的，是个 [[手办]]。\n收件人写的是\"这条路上的某个人\"。\n你下次能不能写自己的名字？"},
+            {type:"act", fn:()=>{ recordMemory("不写自己名字的快递单"); }},
+          ]);
+        }},
+        Te:{ text:"\"这周有外面来面试的吗？\"", fn:()=>{
+          inject([
+            {type:"say", name:"前台 · 小李",
+              text:"有。\n两个 [[35 岁]] 的，三个应届。\n你猜哪个能进？"},
+            {type:"act", fn:()=>{ unlockJargon("35 岁"); }},
+          ]);
+        }},
+        Si:{ text:"\"上一个项目走的人，你都还记得吗？\"", fn:()=>{
+          inject([
+            {type:"say", name:"前台 · 小李",
+              text:"我记得。\n但我不能说。\n你们公司教我的第一件事就是：「前台不许说」。"},
+            {type:"act", fn:()=>{ unlockJargon("解散"); }},
+          ]);
+        }},
+        Ne:{ text:"\"如果你明天辞职，谁会替你？\"", fn:()=>{
+          inject([
+            {type:"say", name:"前台 · 小李",
+              text:"我妹。\n她已经在等。\n[[N+1]] 都不用发。"},
+            {type:"act", fn:()=>{ unlockJargon("N+1"); }},
+          ]);
+        }},
+      }},
+  ]);
+}
+
+/* ===================== NPC TALK ===================== */
+function npcDialog(n){
+  switch(n.id){
+    case "tian": return [
+      {type:"say", name:n.name,
+        text:"……你脸色不太对。"},
+      {type:"choice", name:n.name,
+        prompt:"田搓了一把脸。", options8:{
+          Si:{ text:"\"你在这家公司多久了？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"快 5 年。\n刚好赶上行业最热的尾巴。\n现在赶上裁员的开头。"},
+              {type:"act",fn:()=>{ unlockJargon("二游"); recordMemory("行业最热的那段时间"); }},
+            ]);
+          }},
+          Ne:{ text:"\"你最近在玩什么？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"《[[蓝档案]]》《鸣潮》《绝区零》。\n上下班路上轮流打卡。\n打完之后什么都不剩。"},
+              {type:"act",fn:()=>{ unlockJargon("蓝档案"); unlockJargon("二游"); }},
+            ]);
+          }},
+          Te:{ text:"\"你怎么看公司未来？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"未来？\n[[首日]]流水如果撑不到预期，\n下一轮 [[N+1]] 就到我们这层。"},
+              {type:"act",fn:()=>{ unlockJargon("首日"); unlockJargon("N+1"); }},
+            ]);
+          }},
+          Fi:{ text:"\"你昨晚睡好了吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……谁睡得好啊。\n（"+pronoun()+"轻轻地笑了一下，没有声音。）"},
+              {type:"act",fn:()=>{ recordMemory("田也睡不好"); }},
+            ]);
+          }},
+          /* shadow */
+          Fe:{ text:"\"你也辛苦了。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……我没事。\n你也是。"}]);
+          }},
+          Ti:{ text:"\"你信公司说的那些话吗？\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"信。\n至少在 PPT 里我信。"}]);
+          }},
+          Ni:{ text:"\"你迟早也会走的。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……\n会走。\n但不是现在。"}]);
+          }},
+          Se:{ text:"\"晚上一起去 livehouse？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"……你也听 [[GBC]]？\n那个 \"祈り\" 的现场版我循环了一周。"},
+              {type:"act", fn:()=>{ unlockJargon("livehouse"); unlockJargon("GBC"); recordMemory("自己也想去 livehouse"); }},
+            ]);
+          }},
+        }},
+    ];
+
+    case "lin": return [
+      {type:"say", name:n.name, text:"嗨。\n你也刚来？"},
+      {type:"choice", name:n.name,
+        prompt:"小林看起来比昨天瘦了点。", options8:{
+          Ni:{ text:"\"你也在等什么瞬间出现吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"我 20 岁的时候想，[[35岁]]我一定已经退休了。\n现在我 27。\n我不知道自己 32 岁会是什么样。"},
+              {type:"act",fn:()=>{ unlockJargon("35岁"); addKeyword("焦虑"); }},
+            ]);
+          }},
+          Te:{ text:"\"算过 35 岁退休需要多少钱吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"算过。\n没算下来。\n我每个月把工资的一半存起来。\n剩下的一半交给上海的房租和咖啡。"},
+              {type:"act",fn:()=>{ unlockJargon("35岁"); }},
+            ]);
+          }},
+          Fi:{ text:"\"你做这些……自己开心吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"……你这种问题，能不要问吗。"},
+              {type:"say", name:n.name, text:"……不开心。\n但好像也没别的出口。"},
+              {type:"act",fn:()=>{ addKeyword("快乐耻辱"); unlockJargon("快乐耻辱"); }},
+            ]);
+          }},
+          Ne:{ text:"\"如果你明天就辞职，会发生什么？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"明天？\n应该会有 N+1。\n我攒了两年的钱了。\n等 [[35岁]]，我就辞职。\n做一个自己想做的。"},
+              {type:"say", name:n.name,
+                text:"（"+pronoun()+"说这话的时候眼睛亮了一下，\n然后又灭了。）"},
+              {type:"act",fn:()=>{
+                addKeyword("独立游戏"); unlockJargon("N+1");
+                state.flags.indieSpark = (state.flags.indieSpark||0)+1;
+                recordMemory("有人和你一样想做独立游戏");
+              }},
+            ]);
+          }},
+          Ti:{ text:"\"你刚才说的逻辑有漏洞。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……我知道。\n我只是不想停下来。"}]);
+          }},
+          Fe:{ text:"递了一杯水", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……谢谢。"}]);
+          }},
+          Si:{ text:"\"记得你刚入职的时候吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"记得。\n那时候我每天都加到 12 点，\n但我觉得我在做的东西很好。"},
+              {type:"act",fn:()=>{ recordMemory("有些人也曾经相信过"); }},
+            ]);
+          }},
+          Se:{ text:"\"走，下楼喝杯咖啡。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……不了。\n会议在 14:00。\n我得在之前把 [[配表]] 写完。"},
+              {type:"act",fn:()=>{ unlockJargon("配表"); discoverSchedule(e=>e.day===state.day && e.category==="work" && e.hour===14); }},
+            ]);
+          }},
+        }},
+    ];
+
+    case "mimi": return [
+      {type:"say", name:n.name, text:"早。\n昨晚接的稿还没改完。"},
+      {type:"choice", name:n.name,
+        prompt:"米米手没停过。", options8:{
+          Fi:{ text:"\"你画的，自己喜欢吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"喜欢的不是这些。\n是下班之后画的那些。\n那些我自己存在画师社区。\n那些没人付钱，但是我自己看得下去。"},
+              {type:"act",fn:()=>{ addKeyword("自我实现"); recordMemory("自己存的东西"); }},
+            ]);
+          }},
+          Te:{ text:"\"接稿时薪算过没？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"算过。\n超过公司工资了。\n我说\"超过就辞职\"，但我没走。\n好像也没什么必要。"},
+              {type:"act",fn:()=>{ addKeyword("小画家"); }},
+            ]);
+          }},
+          Si:{ text:"\"你最近见到过太阳吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……\n早上来的时候太阳没出来。\n晚上回去的时候已经下山了。\n上一次见到太阳，好像是一个周日的下午。"},
+              {type:"say", name:n.name,
+                text:"对了——周四 14:00 大返工评审，你别迟到。"},
+              {type:"act",fn:()=>{ discoverSchedule(e=>e.day===4 && e.category==="work"); }},
+            ]);
+          }},
+          Ne:{ text:"\"如果不画了，你会做什么？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"我以为我可以做很多。\n现在发现，不画的话，我没有别的可做。"},
+              {type:"act",fn:()=>{ recordMemory("自己以前以为能做很多"); }},
+            ]);
+          }},
+          /* shadow */
+          Fe:{ text:"\"我看过你昨天发的同人。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……谢谢。\n那张是给 [[推し]] 画的。\n你是 DD 吗？"},
+              {type:"act",fn:()=>{ unlockJargon("推し"); unlockJargon("DD"); }},
+            ]);
+          }},
+          Ti:{ text:"指出她画稿里一个透视错误", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……\n我看到了。\n我知道。\n但客户没看出来，就当它对了。"}]);
+          }},
+          Ni:{ text:"\"你迟早会停下来。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"我知道。\n我希望那一天，是我自己选的。"}]);
+          }},
+          Se:{ text:"\"今晚一起去 livehouse？听 GBC tribute。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"今晚还有两单。\n下下周吧。\n你去的话替我喊一声 \"祈り\"。"},
+              {type:"act", fn:()=>{ unlockJargon("livehouse"); }},
+            ]);
+          }},
+        }},
+    ];
+
+    case "zheye": return [
+      {type:"say", name:n.name, text:"……"},
+      {type:"say", name:n.name,
+        text:"我每天最放松的时候是下班之后\n戴上耳机\n见绿灯就走。"},
+      {type:"choice", name:n.name,
+        prompt:"哲也摘下半边耳机。", options8:{
+          Ni:{ text:"\"你是在等什么吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"我在等\"那一瞬间\"。\n听说独立游戏的灵感来的时候，\n人是知道的。\n我还没等到。"},
+              {type:"act",fn:()=>{ unlockJargon("立项"); recordMemory("独立游戏的灵感"); }},
+            ]);
+          }},
+          Ti:{ text:"\"你听的是什么？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……今天循环 [[MyGO]]。\n第二季的 \"碧海风\"。\n这首适合走夜路。"},
+              {type:"act",fn:()=>{ unlockJargon("MyGO"); discoverSchedule(e=>e.category==="life" && e.day===state.day+1); }},
+            ]);
+          }},
+          Se:{ text:"\"哪天带我一起走走。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……可以。\n但我不说话。"}]);
+          }},
+          Fi:{ text:"\"你这样走，是在逃跑吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"算是。\n但跑得动的时候，至少证明腿还在。"},
+              {type:"act",fn:()=>{ recordMemory("跑得动至少证明腿还在"); }},
+            ]);
+          }},
+          /* shadow */
+          Te:{ text:"\"耳机降噪型号？\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"Sony XM6。\n二手买的。\n值。"}]);
+          }},
+          Fe:{ text:"\"你看起来比昨天好一点。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"昨天我一句话都没说。\n今天和你说了三句。\n是好一点。"}]);
+          }},
+          Ne:{ text:"\"你想过把走的路线做成游戏吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……\n你怎么知道？\n我硬盘里有一个 prototype。\n你这种人，是不是写过 GameJam？"},
+              {type:"act",fn:()=>{ state.flags.indieSpark=(state.flags.indieSpark||0)+1; recordMemory("自己写过 GameJam"); }},
+            ]);
+          }},
+          Si:{ text:"\"你以前不戴耳机的。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"以前不戴。\n以前不需要。"}]);
+          }},
+        }},
+    ];
+
+    case "cheng": return [
+      {type:"say", name:n.name,
+        text:"游戏开发是人类目前为止\n复杂度最高的创作。\n\n没有任何一个 200 人以上的团队\n敢说自己能 100% 控制自己要产出什么。"},
+      {type:"choice", name:n.name,
+        prompt:"橙子陷在沙发里。", options8:{
+          Ti:{ text:"\"那为什么不拆成小团队？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"拆过。\n小团队又会被吞回去。\n资本一定要规模。"},
+              {type:"act",fn:()=>{ unlockJargon("MG"); unlockJargon("立项"); }},
+            ]);
+          }},
+          Ni:{ text:"\"那为什么还在做？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……因为游戏是伟大的文化创作。\n是值得我投入一生的。\n\n或许艺术家就应该死后才出名。\n活着挣到钱的，就变成资本家了。"},
+              {type:"act",fn:()=>{ addKeyword("矛盾"); maybeEnterDepressed(0.10); }},
+            ]);
+          }},
+          Te:{ text:"\"项目预期 [[流水]] 多少？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"高。\n比你想的高。\n但低于上面想的。\n所以我们都要再加一轮班。"},
+              {type:"act",fn:()=>{ unlockJargon("流水"); unlockJargon("Crunch"); unlockJargon("首日"); }},
+            ]);
+          }},
+          Fi:{ text:"\"你做这个还快乐吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……\n我已经不知道这个问题的答案了。"},
+              {type:"act",fn:()=>{ addKeyword("矛盾"); }},
+            ]);
+          }},
+          Ne:{ text:"\"我们能不能换一个方向？\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"换不动了。\n这艘船太重了。"}]);
+          }},
+          Fe:{ text:"\"你也辛苦了。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……谢谢。\n这话我很久没听到了。"}]);
+          }},
+          Si:{ text:"\"你以前不是这么说话的。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"以前我也不是 [[主策]]。\n以前我画过原画。"},
+              {type:"act",fn:()=>{ unlockJargon("主策"); unlockJargon("原画"); }},
+            ]);
+          }},
+          Se:{ text:"打开他面前的一份文档，直接帮他改两行", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……谢谢。\n你这两行，比我半天写的都准。"}]);
+          }},
+        }},
+    ];
+
+    case "gz": return [
+      {type:"say", name:n.name,
+        text:"哟，早。\n你那边的需求，下午四点前发我。"},
+      {type:"choice", name:n.name,
+        prompt:"GZ 搓了一把脸。", options8:{
+          Te:{ text:"\"我已经发了。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"那行。\n等会一起对一下 [[KPI]]。"},
+              {type:"act",fn:()=>{ unlockJargon("KPI"); discoverSchedule(e=>e.day===state.day && e.category==="work"); }},
+            ]);
+          }},
+          Ti:{ text:"\"先问下：[[OKR]] 和 [[KPI]] 这次怎么算？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"我也不知道。\n上面也不知道。\n反正你写出来都对。"},
+              {type:"act",fn:()=>{ unlockJargon("OKR"); unlockJargon("KPI"); }},
+            ]);
+          }},
+          Si:{ text:"\"你最近怎么瘦了那么多？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"我妈住院了。\n我每个礼拜都飞回去。\n我现在的工资……\n比我爸退休工资多十倍。\n但我还是住合租房。"},
+              {type:"act",fn:()=>{ addKeyword("家庭"); recordMemory("有人比你更难"); }},
+            ]);
+          }},
+          Fe:{ text:"\"你别太逼自己。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"逼不了别人，只能逼自己。\n这就是 [[管线]] 负责人。"},
+              {type:"act",fn:()=>{ unlockJargon("跳板"); }},
+            ]);
+          }},
+          Ne:{ text:"\"如果项目黄了你打算去哪儿？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"回家继承我妈的卤肉店。\n（笑）。"},
+              {type:"act",fn:()=>{ unlockJargon("卤肉店"); }},
+            ]);
+          }},
+          Fi:{ text:"\"你做这个，是不是已经不开心了？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"开心。\n一个礼拜里，有十分钟开心。\n够了。"},
+              {type:"act", fn:()=>{ recordMemory("一周里十分钟"); }},
+            ]);
+          }},
+          Ni:{ text:"沉默地看着他", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……你别这样看着我。\n我没事。"}]);
+          }},
+          Se:{ text:"\"中午一起吃饭。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"行。\n楼下黄鱼面。\n38 块，我请。"}]);
+          }},
+        }},
+    ];
+
+    case "bb": return [
+      {type:"say", name:n.name,
+        text:"最近项目数据不太行。\n我每天埋头做 PPT。"},
+      {type:"choice", name:n.name,
+        prompt:"B 看起来很整洁，眼睛却是红的。", options8:{
+          Fi:{ text:"\"你最近开心过吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……\n我有一种 [[快乐耻辱]] 症。\n一旦感到快乐，潜意识里就会说：\n\"我好久没这么快乐了。\"\n然后立刻羞愧——\n\"但我还有那么多事没做呢。\""},
+              {type:"act",fn:()=>{ unlockJargon("快乐耻辱"); addKeyword("快乐耻辱"); }},
+            ]);
+          }},
+          Te:{ text:"\"数据是哪一块掉的？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"7 日留存。\n[[KPI]] 跌了 12%。\n上面要解释。\n我们都知道这个游戏\n已经开始走下坡了。"},
+              {type:"act",fn:()=>{ unlockJargon("KPI"); unlockJargon("流水"); discoverSchedule(e=>e.category==="boss"); }},
+            ]);
+          }},
+          Ne:{ text:"\"你想过换工作吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"想过。\n但换去哪里都一样。\n我妈给我安排了一个相亲。\n听说他也在园区里，997。\n我们莫名其妙就在一起了。"},
+              {type:"act",fn:()=>{ addKeyword("相亲"); unlockJargon("997"); }},
+            ]);
+          }},
+          Si:{ text:"\"你以前不是写小说的吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……\n你怎么知道。\n那是我大学的事。\n现在写一句就觉得，\n\"这是什么呀，真没意思\"，\n然后就放下了。"},
+              {type:"act",fn:()=>{
+                addKeyword("自我实现");
+                state.flags.indieSpark=(state.flags.indieSpark||0)+1;
+                recordMemory("有人也写过自己想写的东西");
+              }},
+            ]);
+          }},
+          /* shadow */
+          Fe:{ text:"\"你今天的 PPT 已经做得很漂亮了。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"漂亮没用。\n上面要看数字。"}]);
+          }},
+          Ti:{ text:"\"那个 KPI 算法本身就有问题。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"我知道。\n但纠这个的成本，比我接受这个数字还高。"}]);
+          }},
+          Ni:{ text:"\"你迟早会逃出去。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"我也希望。\n那个时候，我希望我还想得起来\n自己当年想写的小说是什么。"}]);
+          }},
+          Se:{ text:"\"今晚去喝一杯吧。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"……可以。\n但我酒量不行。"},
+              {type:"act",fn:()=>{ state.flags.bbDrinkInvite = true; }},
+            ]);
+          }},
+        }},
+    ];
+
+    case "yusha": return [
+      {type:"say", name:n.name,
+        text:"我比这层楼所有人年纪都大。\n超过 30 了。"},
+      {type:"choice", name:n.name,
+        prompt:"Yusha 衣服里有干净的颜料味道。", options8:{
+          Si:{ text:"\"你最幸福的时候是什么时候？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"很多年前。\n我带学生去村里写生。\n村里唯一的咖啡厅是个 [[猫咖]]。\n我在那儿全心全意做 GameJam。\n从早写到晚，不舍得睡。"},
+              {type:"say", name:n.name,
+                text:"那游戏最后没做出来。\n但回忆起那段时间——\n整个人是柔软的。"},
+              {type:"act",fn:()=>{
+                unlockJargon("猫咖");
+                state.flags.indieSpark=(state.flags.indieSpark||0)+1;
+                recordMemory("有人最幸福的时候是 GameJam");
+              }},
+            ]);
+          }},
+          Fi:{ text:"\"你后悔来这一片吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"……\n年轻人的选择太多。\n我这个年纪了，\n真的，我就只有一条路。"},
+              {type:"act",fn:()=>{ unlockJargon("35岁"); }},
+            ]);
+          }},
+          Te:{ text:"\"30+ 的人在这一片还有竞争力吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"我朋友 32 岁被裁。\n现在和老婆开幼教班。\n上次见面我帮 Ta 改了半个早教 PPT。\n\n我就是不想成为那张 PPT。"},
+              {type:"act",fn:()=>{ addKeyword("裁员"); }},
+            ]);
+          }},
+          Ni:{ text:"\"你已经知道自己迟早要走了，对吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"对。\n我留下来是因为我还需要再攒一点。\n手艺人有手艺人的安全感。"},
+            ]);
+          }},
+          Ne:{ text:"\"你试过创业吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"试过。\n2019 年，三个人。\n撑了 9 个月。"},
+              {type:"act",fn:()=>{ unlockJargon("MG"); }},
+            ]);
+          }},
+          Se:{ text:"\"我请你喝一杯。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"……谢谢。\n下班后吧。"},
+              {type:"act",fn:()=>{ state.flags.yushaDrinkInvite = true; }},
+            ]);
+          }},
+          Fe:{ text:"\"你比这层楼所有人都温柔。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"温柔不挣钱。\n但温柔能让我活到现在。"}]);
+          }},
+          Ti:{ text:"\"你刚才说的那个 GameJam，规则其实有问题。\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"我知道。\n但规则有问题不影响我开心。"}]);
+          }},
+        }},
+    ];
+
+    case "ayi": return [
+      {type:"say", name:n.name, text:"哎，早。\n你这么早啊。"},
+      {type:"choice", name:n.name,
+        prompt:"阿姨手里抱着拖把。", options8:{
+          Fe:{ text:"\"阿姨，您也别太累。\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"哎哟，你们年轻人真好。\n你昨天把水果塞给我了，谢谢啊。"},
+              {type:"act", fn:()=>{ recordMemory("阿姨记得你"); }},
+            ]);
+          }},
+          Si:{ text:"\"上回楼里那个项目，是您说的吧？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"对。\n那天一层楼的人都在打电话找下家。\n只有我蹲在茶水间哭。\n\n我喜欢这份工作。\n我可能再也找不到这么好的工作了。"},
+              {type:"act",fn:()=>{ addKeyword("解散"); maybeEnterDepressed(0.20); recordMemory("项目散过一次"); }},
+            ]);
+          }},
+          Te:{ text:"\"您一个月在这边工资够吗？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name,
+                text:"够。\n这一层 [[牛马]] 都是好孩子。\n你们工资比我高，但你们大概也很累。"},
+              {type:"act",fn:()=>{ unlockJargon("牛马"); }},
+            ]);
+          }},
+          Ne:{ text:"\"如果哪天楼里项目散了呢？\"", fn:()=>{
+            inject([
+              {type:"say", name:n.name, text:"那就再找一个。\n别的楼也有公司。\n你们呢？"},
+            ]);
+          }},
+          Fi:{ text:"什么也不说，给阿姨递了瓶水", fn:()=>{
+            inject([{type:"say", name:n.name, text:"哎哟，谢谢。"}]);
+          }},
+          Ti:{ text:"\"楼里垃圾分类是您一个人管的？\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"我管两层。\n下午有人接班。"}]);
+          }},
+          Ni:{ text:"沉默地看着她", fn:()=>{
+            inject([{type:"say", name:n.name, text:"……\n你这孩子，看上去像没睡醒。\n回去眯一会儿吧。"}]);
+          }},
+          Se:{ text:"\"阿姨吃过早饭了吗？\"", fn:()=>{
+            inject([{type:"say", name:n.name, text:"吃过了。\n你呢？\n你们这些孩子，都不怎么吃饭。"}]);
+          }},
+        }},
+    ];
+  }
+  return [{type:"say", name:n.name, text:"……"}];
+}
+
+/* ===================== STATE / TRIGGERS ===================== */
+function maybeEnterDepressed(p){
+  p = (p===undefined ? 1 : p);
+  if(state.specialState) return;
+  if(Math.random() < p) setState("depressed", 4);
+}
+function settleAnxietyAtEndOfDay(){
+  const overtimeToday = !!state.flags["d"+state.day+"_overtimeMark"];
+  if(overtimeToday){
+    state.overtimeStreak = (state.overtimeStreak || 0) + 1;
+    state.anxietyRestDays = 0;
+    if(state.overtimeStreak >= 2 && !state.anxietyActive){
+      state.anxietyActive = true;
+      state.flags.anxietyJustTriggered = true;
+    }
+    return;
+  }
+  state.overtimeStreak = 0;
+  if(state.anxietyActive){
+    state.anxietyRestDays = (state.anxietyRestDays || 0) + 1;
+    if(state.anxietyRestDays >= 2){
+      state.anxietyActive = false;
+      state.anxietyRestDays = 0;
+      state.flags.anxietyClearedToday = true;
+    }
+  }
+}
+function addKeyword(k){
+  if(!state.keywords.includes(k)){
+    state.keywords.push(k);
+    floatText("＋ "+k);
+  }
+}
+
+/* ===================== REVIEW ===================== */
+function buildGreenlitGameName(){
+  const focus = state.projectFocus || {};
+  const winner = Object.entries(focus).sort((a,b)=>b[1]-a[1])[0]?.[0] || "design";
+  const spoof = {
+    program:["mh-方神","ak-明日方舟神经版"],
+    art:["ys-绘神","zz-绝区灵感"],
+    qa:["qa-崩坏测试铁道","tb-提包小队"],
+    design:["pr-重返立项1999","nm-星穹策划线"],
+    system:["sys-配表王者","lg-逻辑回响"],
+    experience:["sg-手感守望","kt-快打地平线"],
+    coordination:["pm-群聊启示录","co-协作幻想"],
+  }[winner] || ["mh-方神"];
+  return spoof[Math.floor(Math.random()*spoof.length)];
+}
+function runReview(){
+  const indie = state.flags.indieSpark || 0;
+  const dep   = state.depressedTimes;
+  const jar   = state.unlockedJargon.size;
+  const grids = state.project.progress;
+  const topFn = topStack()[0];
+  const matchScore =
+    (topFn==="Te"||topFn==="Si"||topFn==="Fi") ? 4 :
+    (topFn==="Fe"||topFn==="Ti"||topFn==="Se") ? 2 : -1;
+  state.flags.reviewBonus = 0;
+  scene = null;
+  document.getElementById("dialogue").classList.add("show");
+  runScene([
+    {type:"say", name:"系统",
+     text:"——  DAY 8  ·  评  审 会 议 室  ——\n\n你被叫进会议室。\n墙上挂着「"+COMPANY_NAME+" · 评审专用」的牌子。"},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"来，开始。\n我只看两件事：\n第一，能不能活；第二，能不能火。\n别端着，直接说。"},
+    {type:"choice", name:"土狗 / 总制作人", prompt:"第一轮：你怎么汇报当前版本？", options8:{
+      Te:{ text:"先报风险与里程碑", fn:()=>{ state.flags.reviewBonus += 3; }},
+      Ne:{ text:"先讲愿景和用户情绪", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Fi:{ text:"先讲作品表达和价值", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Ti:{ text:"先讲指标算法和样本量", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Si:{ text:"逐条复盘 7 天所有改动", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Fe:{ text:"先感谢各部门并背锅", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Se:{ text:"现场演示手感变化", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Ni:{ text:"先讲半年后的产品路径", fn:()=>{ state.flags.reviewBonus += 2; }},
+    }},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"行。\n第二轮：你要我批资源，就给我一句人话，告诉我你偏哪个方向。"},
+    {type:"choice", name:"土狗 / 总制作人", prompt:"第二轮：你申请的主方向是？", options8:{
+      Fi:{ text:"美术体验优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.art += 2; }},
+      Si:{ text:"QA 稳定优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.qa += 2; }},
+      Te:{ text:"程序性能优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.program += 2; }},
+      Ne:{ text:"新玩法试验优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.design += 2; }},
+      Ti:{ text:"系统深度优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.system += 2; }},
+      Fe:{ text:"协作效率优先", fn:()=>{ state.flags.reviewBonus += 1; state.projectFocus.coordination += 2; }},
+      Se:{ text:"手感反馈优先", fn:()=>{ state.flags.reviewBonus += 1; state.projectFocus.experience += 2; }},
+      Ni:{ text:"长线赛季优先", fn:()=>{ state.flags.reviewBonus += 2; state.projectFocus.design += 1; }},
+    }},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"最后一轮。\n如果炸了，谁背锅？\n你别说「共同承担」，那是空话。"},
+    {type:"choice", name:"* 会议室 · 最后一问", prompt:"你怎么回答？", options8:{
+      Fe:{ text:"我来背", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Te:{ text:"我背项目，管理背排期", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Ti:{ text:"先定义失败，再定义责任", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Fi:{ text:"我不甩锅，但我会保住团队", fn:()=>{ state.flags.reviewBonus += 2; }},
+      Ne:{ text:"如果炸了，就立刻转型", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Si:{ text:"按流程背锅，按文档复盘", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Se:{ text:"炸了就通宵修到能上", fn:()=>{ state.flags.reviewBonus += 1; }},
+      Ni:{ text:"我会提前让它不炸", fn:()=>{ state.flags.reviewBonus += 2; }},
+    }},
+    {type:"act", fn:()=>{
+      unlockJargon("流水"); unlockJargon("首日");
+      const score = Math.round(
+        grids + indie * 1.2 + jar / 6 - dep * 2 + matchScore + (state.flags.reviewBonus||0)
+      );
+      const pass = score >= 20;
+      state.flags.reviewScore = score;
+      state.flags.reviewPass = pass;
+      if(pass) state.flags.greenlitGameName = buildGreenlitGameName();
+    }},
+    {type:"say", name:"系统",
+     text:"投屏上是你这 7 天做出来的东西：\n\n· 项目进度  " + grids + " / 28 格\n· 解锁黑话  " + jar +
+          "\n· 抑郁次数  " + dep +
+          "\n· 独立火花  " + indie +
+          "\n· 当前类型  " + state.mbti +
+          "\n· 评审互动加分  " + (state.flags.reviewBonus||0) +
+          "\n· 评审分数  " + state.flags.reviewScore + " / 20"},
+    {type:"say", name:"土狗 / 总制作人",
+     text:"行，就这样。\n会后把命名给我。\n别写太正常，正常不会被记住。"},
+    {type:"act", fn:()=>{ triggerEnding(state.flags.reviewPass ? "review_pass" : "review_fail"); }},
+  ]);
+}
+
+/* ===================== ENDING ===================== */
+function triggerEnding(reason){
+  state.gameOver = true;
+  scene = null; pendingChoice = null;
+  document.getElementById("dialogue").classList.remove("show");
+  hideChoices();
+  clearInterval(typingTimer);
+  const indie = state.flags.indieSpark || 0;
+  const mem   = state.memoryFragments.length;
+  const dep   = state.depressedTimes;
+  const jar   = state.unlockedJargon.size;
+  const prog  = Math.round(state.project.progress);
+  const score = state.flags.reviewScore;
+  const gameName = state.flags.greenlitGameName;
+
+  /* === 成就 + 元数据 === */
+  META.endings.add(reason);
+  /* 一个本周目本"路线"的细分 ID, 用于精准成就 */
+  let endingId = reason;
+  if(reason === "escape_quit"){
+    achv(indie >= 3 ? "end_quit_indie" : "end_quit");
+    endingId = indie >= 3 ? "escape_quit_indie" : "escape_quit";
+  } else if(reason === "review_pass"){
+    if(indie >= 4)            { achv("end_pass_indie"); endingId = "review_pass_indie"; }
+    else if(dep >= 3)         { achv("end_pass_dep");   endingId = "review_pass_dep"; }
+    else if(topFn()==="Te")   { achv("end_pass_te");    endingId = "review_pass_te"; }
+    else                      { achv("end_pass"); }
+  } else if(reason === "review_fail"){
+    if(indie >= 4)            { achv("end_fail_indie"); endingId = "review_fail_indie"; }
+    else if(dep >= 3)         { achv("end_fail_dep");   endingId = "review_fail_dep"; }
+    else                      { achv("end_fail"); }
+  }
+  META.endings.add(endingId);
+  /* 7 天无异常 + 评审通关 */
+  if(reason === "review_pass" && (!state.abnormalsHit || state.abnormalsHit.size === 0)){
+    achv("iron_heart");
+  }
+  /* 完成的周目数 */
+  META.finishedRuns += 1;
+  if(META.finishedRuns >= 3) achv("many_runs");
+  saveMeta();
+  /* 周目结束: 抹掉 run 存档 */
+  clearRunSave();
+
+  let quote, desc, title;
+  if(reason === "escape_quit"){
+    title = "·  弃 工 离 场  ·";
+    quote = "你按下按钮。\n你不再回头。";
+    desc  = (indie >= 3
+      ? "你 30 岁。下一段路从这里开始。\nDemo DDL 还有几天。\n你大概也做不完。\n但至少你又开始了。"
+      : "外面的天是橙色的。\n你不知道明天该怎么办。\n但今天，你出来了。\n\n你的项目这周不会过了。\n你不太在乎。");
+  } else if(reason === "review_pass" && indie >= 4){
+    title = "·  立 项 通 过  ·  独 立 路 线  ·";
+    quote = "项目过了。\n你也悄悄写完了自己的 demo。";
+    desc  = "白天你交付了一个工业化项目。\n评审会给出的项目代号是「"+(gameName||"mh-方神")+"」。\n晚上你打开 itch.io，\n上传了一个没人要的小东西。\n它有 12 个赞。\n你看了很久。";
+  } else if(reason === "review_pass" && dep >= 3){
+    title = "·  立 项 通 过  ·  代 价 路 线  ·";
+    quote = "项目过了。\n你哭了一会儿。";
+    desc  = "评审之后，办公室里没人多说话。\n你回到工位，\n看着屏幕。\n你不太记得这是不是你想做的那个游戏。";
+  } else if(reason === "review_pass" && topFn()==="Te"){
+    title = "·  立 项 通 过  ·  同 化 路 线  ·";
+    quote = "项目过了。\n你成了那个写「上面要听」的 PPT 的人。";
+    desc  = "下一个项目你大概也能扛下来。\n下下个也是。\n你已经能熟练地说\"这一版我们要 [[长青]]\"了。\n立项单上写着："+(gameName||"mh-方神")+"。";
+  } else if(reason === "review_pass"){
+    title = "·  立 项 通 过  ·";
+    quote = "项目过了。\n你比想象中平静。";
+    desc  = "上面说\"这一版做得不错\"。\n新项目代号定为「"+(gameName||"mh-方神")+"」。\n你说\"谢谢主管\"。\n回家路上你买了一杯瑞幸。\n挺甜的。";
+  } else if(reason === "review_fail" && indie >= 4){
+    title = "·  立 项 失 败  ·  独 立 路 线  ·";
+    quote = "项目黄了。\n但你已经在做下一个。";
+    desc  = "你的工业化项目没立住。\n但你这 7 天写的那个独立 demo——\n上传到 itch.io 之后，\n有人在评论里说\"这是给我做的吧\"。\n你笑了。";
+  } else if(reason === "review_fail" && dep >= 3){
+    title = "·  立 项 失 败  ·  散 架 路 线  ·";
+    quote = "项目黄了。\n你也散架了。";
+    desc  = "下周一开始 [[N+1]] 名单就会出来。\n你不太确定自己会不会在上面。\n你也不太确定自己在不在乎。";
+  } else if(reason === "review_fail"){
+    title = "·  立 项 失 败  ·";
+    quote = "项目黄了。\n下周一闹钟还会响。";
+    desc  = COMPANY_NAME+"说\"再打磨一版\"。\n大家都听懂了。\n但没人敢说出来。\n\n你站在工位前。\n你想起 1996 年的自己——\n那时候 CCG 频道刚开始放动画。\n那时候你也还在。";
+  } else {
+    title = "·  待 续  ·";
+    quote = "你又过完了一周。\n下周还要继续。";
+    desc  = "你没辞职，也没崩溃。\n你只是没有结束。";
+  }
+
+  document.getElementById("endQuote").innerText = quote;
+  document.getElementById("endDesc").innerText  = (title ? title + "\n\n" : "") + desc;
+  document.getElementById("endStats").innerText =
+    "DAY "+state.day+"  ·  类型 "+state.mbti+
+    (score!==undefined ? "  ·  评审 "+score+"/20" : "") +
+    "\n项目 "+prog+"%  ·  黑话 "+jar+
+    "\n抑郁 "+dep+"  ·  记忆 "+mem+
+    (indie>0 ? "  ·  ♥ "+indie : "");
+  document.getElementById("ending").classList.add("show");
+}
+function topFn(){ return topStack()[0]; }
+function restart(){
+  state = freshState();
+  document.getElementById("ending").classList.remove("show");
+  document.getElementById("title").classList.remove("hide");
+  mbtiSetupOn = false; mbtiIntroOn = false;
+  /* restore 田 day-1 schedule */
+  const t = NPCS.find(n=>n.id==="tian");
+  t.schedule[9] = [5,9];
+  showTitleMenu();
+  updateHUD(); draw();
+}
+
+/* ===================== HUD ===================== */
+function updateHUD(){
+  const review = state.day > state.totalDays;
+  const dayLabel = (state.anxietyActive && !review)
+    ? ("DAY " + (1 + Math.floor(Math.random()*state.totalDays)) + "/" + state.totalDays)
+    : ("DAY " + state.day + "/" + state.totalDays);
+  document.getElementById("dayno").innerText = review ? "评审日" : dayLabel;
+  document.getElementById("clock").innerText =
+    WEEK[(state.day-1)%7] + " · " + String(state.hour).padStart(2,"0") + ":" + String(state.minute).padStart(2,"0");
+  document.getElementById("mbtitxt").innerText = state.mbti;
+  if(!state.specialState && state.anxietyActive){
+    const el = document.getElementById("statetxt");
+    el.innerText = "·  焦  虑  ·";
+    el.classList.remove("empty");
+  }
+  const pct = Math.round(100 * state.project.progress / PROJECT_TOTAL);
+  document.getElementById("pfill").style.width = pct + "%";
+  document.getElementById("ppct").innerText = state.project.progress + "/" + PROJECT_TOTAL;
+  renderSidePanel();
+  /* 自动存档 (轻量, 仅在游戏真正开始后写) */
+  if(state.runStarted && !state.gameOver) saveRun();
+}
+
+/* ===================== SCHEDULE UI ===================== */
+let scheduleOpen = false;
+function openSchedule(){
+  scheduleOpen = true;
+  const wrap = document.getElementById("schedList");
+  wrap.innerHTML = "";
+  const byDay = {};
+  for(const e of state.schedule){
+    if(!e.discovered) continue;
+    (byDay[e.day] = byDay[e.day]||[]).push(e);
+  }
+  let any = false;
+  for(let d=1; d<=5; d++){
+    const items = byDay[d];
+    if(!items) continue;
+    any = true;
+    items.sort((a,b)=>a.hour-b.hour);
+    const dayBox = document.createElement("div");
+    dayBox.className = "day";
+    const h = document.createElement("h4");
+    h.innerText = "DAY " + d + "  ·  " + WEEK[(d-1)%7];
+    dayBox.appendChild(h);
+    for(const e of items){
+      const row = document.createElement("div");
+      row.className = "entry" + ((d===state.day && e.hour===state.hour) ? " now" : "");
+      const t  = document.createElement("span"); t.className="t"; t.innerText = String(e.hour).padStart(2,"0")+":00";
+      const ti = document.createElement("span"); ti.className="ti"; ti.innerText = e.title;
+      const cat= document.createElement("span"); cat.className="cat "+e.category;
+      cat.innerText = ({work:"WORK",life:"LIFE",boss:"BOSS",dis:"???"})[e.category] || e.category;
+      const so = document.createElement("span"); so.className="source"; so.innerText = "@"+e.source;
+      row.appendChild(t); row.appendChild(ti); row.appendChild(cat); row.appendChild(so);
+      dayBox.appendChild(row);
+    }
+    wrap.appendChild(dayBox);
+  }
+  if(!any){
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.innerText = "（你的日程是空的。\n试着和同事聊一聊，或者看看白板。）";
+    wrap.appendChild(empty);
+  }
+  document.getElementById("scheduleUI").classList.add("show");
+}
+function closeSchedule(){
+  scheduleOpen = false;
+  document.getElementById("scheduleUI").classList.remove("show");
+}
+
+/* ===================== MAP VIEW (M 键) ===================== */
+let mapViewOpen = false;
+/* 楼层结构示意图：每行一个房间 token，*** 包裹当前房间 */
+const FLOOR_LAYOUT = [
+  { floor:9, label:"楼  顶", rooms:["rooftop"] },
+  { floor:2, label:"F 2", rooms:[
+    "work_area","corridor_2f","meeting","pantry","print_room",
+    "male_pod","female_pod","restroom_2f","elevator_2f"
+  ]},
+  { floor:1, label:"F 1", rooms:["lobby","gym"] },
+  { floor:0, label:"室  外", rooms:["smoking"] },
+];
+function openMapView(){
+  mapViewOpen = true;
+  const here = state.player.room;
+  const lines = [];
+  lines.push("");
+  for(const fl of FLOOR_LAYOUT){
+    const tag = fl.label.padEnd(6," ");
+    let row = "  " + tag + " │ ";
+    const cells = fl.rooms.map(rid => {
+      const name = ROOMS[rid].name;
+      if(rid === here) return "<span class='here'>★ "+name+" ★</span>";
+      return name;
+    });
+    row += cells.join("  ·  ");
+    lines.push(row);
+    lines.push("         │");
+  }
+  lines.pop();
+  lines.push("");
+  lines.push("                    [ 电  梯  连  通  各  层 ]");
+  document.getElementById("mapContent").innerHTML = lines.join("\n");
+  document.getElementById("mapView").classList.add("show");
+}
+function closeMapView(){
+  mapViewOpen = false;
+  document.getElementById("mapView").classList.remove("show");
+}
+
+/* ===================== SIDE PANEL (28 grids) ===================== */
+function renderSidePanel(){
+  const stack = document.getElementById("gridStack");
+  if(!stack) return;
+  if(stack.childElementCount !== PROJECT_TOTAL){
+    stack.innerHTML = "";
+    for(let i=0;i<PROJECT_TOTAL;i++){
+      const c = document.createElement("div");
+      c.className = "gcell";
+      stack.appendChild(c);
+    }
+  }
+  const filled = state.project.progress;
+  const cells = stack.children;
+  for(let i=0;i<PROJECT_TOTAL;i++){
+    cells[i].className = "gcell" + (i < filled ? " fill" : "");
+  }
+  document.getElementById("gridNow").innerText = filled;
+  document.getElementById("gridTotal").innerText = PROJECT_TOTAL;
+}
+
+/* ===================== RENDER ===================== */
+const cvs = document.getElementById("game");
+const ctx = cvs.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+
+/* ========== v0.7.0.0.6: 交互物荧光轮廓 + 门外侧目的地名 ========== */
+/* 需要高亮的 tile (电梯 E / 睡眠仓 S,Q / 墙 # / 地板 . / 装饰 f,d / 门 + 不在列) */
+const INTERACT_TILES = new Set([
+  "F","D","M","T","C","P","B","L","m","w","R","g","X","r","N"
+]);
+function drawInteractGlow(px, py){
+  const t = Date.now()/650;
+  const pulse = 0.35 + Math.sin(t)*0.18;
+  ctx.save();
+  ctx.strokeStyle = "#ffe100";
+  ctx.shadowColor = "#ffe100";
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = pulse;
+  ctx.shadowBlur = 14;
+  ctx.strokeRect(px+2, py+2, TILE-4, TILE-4);
+  ctx.globalAlpha = pulse * 0.5;
+  ctx.shadowBlur = 4;
+  ctx.strokeRect(px+0.5, py+0.5, TILE-1, TILE-1);
+  ctx.restore();
+}
+function drawNPCGlow(px, py){
+  const t = Date.now()/650;
+  const pulse = 0.35 + Math.sin(t + 1.1)*0.18;
+  ctx.save();
+  ctx.globalAlpha = pulse;
+  ctx.shadowBlur = 14;
+  ctx.shadowColor = "#7bd0ff";
+  ctx.strokeStyle = "#7bd0ff";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  /* 椭圆轮廓包住人物 */
+  ctx.ellipse(px+TILE/2, py+TILE/2+2, TILE*0.48, TILE*0.56, 0, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawDoorLabels(ox, oy){
+  const r = currentRoom();
+  if(!r.doors) return;
+  ctx.save();
+  ctx.font = "10px monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for(const d of r.doors){
+    /* 找到门外侧(与门相邻的可走地板) 作为放标签的位置 */
+    const cand = [[0,-1],[0,1],[-1,0],[1,0]];
+    let chosen = null;
+    for(const [cx,cy] of cand){
+      const tx = d.x+cx, ty = d.y+cy;
+      if(tx<0||tx>=r.w||ty<0||ty>=r.h) continue;
+      const tt = r.grid[ty][tx];
+      /* 地板优先 */
+      if(tt === "."){ chosen = [cx,cy]; break; }
+    }
+    if(!chosen){
+      /* 没有相邻地板 (门通向外部) = 放在门的另一侧 (地图外) — 给一个默认偏移 */
+      /* 按门位置推断最可能的"外侧" */
+      if(d.y === 0) chosen = [0,-1];
+      else if(d.y === r.h-1) chosen = [0,1];
+      else if(d.x === 0) chosen = [-1,0];
+      else chosen = [1,0];
+    }
+    const [cx, cy] = chosen;
+    /* label 原始文字: 优先用 door.label, 其次从 ROOMS 取目的地名 */
+    const raw = d.label || (ROOMS[d.to] ? ROOMS[d.to].name : d.to);
+    /* 去掉开头的"前往/返回/进入/出去到" 前缀, 直接显示房间名 */
+    const label = raw.replace(/^(前往|返回|进入|出去到)\s*/, "→ ");
+    /* 文字位置: 门 tile 中心 + 朝外侧偏 0.55 格 */
+    const lx = d.x*TILE + TILE/2 + ox + cx*TILE*0.55;
+    const ly = d.y*TILE + TILE/2 + oy + cy*TILE*0.55;
+    /* 文字底色 */
+    const tw = ctx.measureText(label).width + 10;
+    ctx.fillStyle = "rgba(0,0,0,0.72)";
+    ctx.fillRect(lx - tw/2, ly - 8, tw, 16);
+    ctx.strokeStyle = "rgba(255,225,0,0.55)";
+    ctx.strokeRect(lx - tw/2, ly - 8, tw, 16);
+    ctx.fillStyle = "#ffe100";
+    ctx.fillText(label, lx, ly+1);
+  }
+  ctx.restore();
+}
+
+function draw(){
+  ctx.fillStyle = "#06030a";
+  ctx.fillRect(0,0,cvs.width,cvs.height);
+  const r = currentRoom();
+  if(!r) return;
+  const { ox, oy } = roomOffset();
+  /* 房间外的暗色，简单画一个边框背景 */
+  ctx.fillStyle = "#0f0c14";
+  ctx.fillRect(ox-2, oy-2, r.w*TILE+4, r.h*TILE+4);
+  for(let y=0;y<r.h;y++){
+    for(let x=0;x<r.w;x++) drawTile(x, y, r.grid[y][x], ox, oy);
+  }
+  /* 交互物荧光轮廓 (除电梯/睡眠仓/门外) */
+  for(let y=0;y<r.h;y++){
+    for(let x=0;x<r.w;x++){
+      const t = r.grid[y][x];
+      if(INTERACT_TILES.has(t)){
+        drawInteractGlow(x*TILE+ox, y*TILE+oy);
+      }
+    }
+  }
+  /* NPCs in this room */
+  const list = npcsInRoom(state.player.room, state.hour);
+  for(const it of list){
+    drawNPCGlow(it.x*TILE+ox, it.y*TILE+oy);
+    drawNPC(it.npc, it.x, it.y, ox, oy);
+  }
+  /* hallucinated NPC */
+  if(state.specialState && state.specialState.name==="hallu" && Math.floor(Date.now()/600)%2===0){
+    drawNPC({name:"???",color:"#660066",hair:"#000"},
+            Math.floor(Math.random()*r.w),
+            Math.floor(Math.random()*r.h),
+            ox, oy);
+  }
+  drawPlayer(ox, oy);
+  drawDoorLabels(ox, oy);
+  drawInteractHint(ox, oy);
+  drawRegionLabel();
+  drawFloaters();
+  drawStateVignette();
+}
+
+function drawTile(x, y, t, ox, oy){
+  const px = x*TILE + ox, py = y*TILE + oy;
+  /* 室外房间 (smoking) 用不同的地砖 */
+  const outside = state.player.room === "smoking" || state.player.room === "rooftop";
+  if(t === "."){
+    if(outside){
+      ctx.fillStyle = "#1a2218"; ctx.fillRect(px,py,TILE,TILE);
+      ctx.fillStyle = "#23311c"; ctx.fillRect(px+2,py+2,2,2);
+    } else {
+      ctx.fillStyle = "#15111b"; ctx.fillRect(px,py,TILE,TILE);
+      ctx.fillStyle = "#1d1825"; ctx.fillRect(px+2,py+2,2,2);
+      ctx.fillRect(px+TILE-4,py+TILE-4,2,2);
+    }
+    return;
+  }
+  /* 装饰小写：椅子等不可走 */
+  if(t === "f" || t === "d"){
+    ctx.fillStyle = "#15111b"; ctx.fillRect(px,py,TILE,TILE);
+    ctx.fillStyle = "#3a2c46"; ctx.fillRect(px+8, py+10, 16, 12);
+    ctx.fillStyle = "#251d34"; ctx.fillRect(px+8, py+10, 16, 3);
+    return;
+  }
+  /* 给非地板 tile 先垫一层暗色地砖 */
+  ctx.fillStyle = outside ? "#1a2218" : "#15111b";
+  ctx.fillRect(px,py,TILE,TILE);
+  if(t==="#"){
+    ctx.fillStyle = outside ? "#0a0d10" : "#2a2230"; ctx.fillRect(px,py,TILE,TILE);
+    ctx.fillStyle = outside ? "#11151a" : "#3a3044"; ctx.fillRect(px,py,TILE,3);
+    ctx.fillStyle = "#120f17"; ctx.fillRect(px,py+TILE-3,TILE,3);
+  } else if(t==="+"){
+    /* 门 - 金色光晕 (不再把"门"字画在门上, 目的地名改画在门外侧) */
+    ctx.fillStyle = "#1a1326"; ctx.fillRect(px,py,TILE,TILE);
+    const a = 0.5 + Math.sin(Date.now()/300 + x + y)*0.3;
+    ctx.fillStyle = `rgba(255,225,0,${a})`;
+    ctx.fillRect(px+8, py+4, TILE-16, TILE-8);
+    ctx.strokeStyle = "#ffe100";
+    ctx.strokeRect(px+8, py+4, TILE-16, TILE-8);
+    /* 小门把 */
+    ctx.fillStyle = "#000";
+    ctx.fillRect(px+TILE/2-1, py+TILE/2, 2, 3);
+  } else if(t==="D"){
+    /* 同事工位（与 F 类似但屏幕灰一点） */
+    ctx.fillStyle = "#46362b"; ctx.fillRect(px+2, py+6, TILE-4, 18);
+    ctx.fillStyle = "#6b513f"; ctx.fillRect(px+2, py+6, TILE-4, 3);
+    ctx.fillStyle = "#111"; ctx.fillRect(px+8, py+2, 16, 12);
+    /* 屏幕颜色按状态 */
+    const owner = DESK_OWNERS[x+","+y];
+    if(owner && owner.status === "active"){
+      ctx.fillStyle = "#7b6a8c"; ctx.fillRect(px+9, py+3, 14, 10);
+      if((Math.floor(Date.now()/600)+x)%3===0){
+        ctx.fillStyle = "#fff"; ctx.fillRect(px+10, py+8, 6, 1);
+      }
+    } else {
+      ctx.fillStyle = "#252028"; ctx.fillRect(px+9, py+3, 14, 10);
+    }
+  } else if(t==="F"){
+    /* 你的工位 - 屏幕亮蓝色 + YOU 标记 */
+    ctx.fillStyle = "#46362b"; ctx.fillRect(px+2, py+6, TILE-4, 18);
+    ctx.fillStyle = "#6b513f"; ctx.fillRect(px+2, py+6, TILE-4, 3);
+    ctx.fillStyle = "#111";    ctx.fillRect(px+8, py+2, 16, 12);
+    ctx.fillStyle = "#5ad2ff"; ctx.fillRect(px+9, py+3, 14, 10);
+    if((Math.floor(Date.now()/300)+x+y)%3===0){
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(px+10, py+5, 4, 1); ctx.fillRect(px+10, py+8, 8, 1); ctx.fillRect(px+10, py+11, 6, 1);
+    }
+    ctx.fillStyle = "#1a1a22"; ctx.fillRect(px+10, py+24, 12, 6);
+    ctx.fillStyle = "#ffe100";
+    ctx.font = "7px monospace"; ctx.textAlign = "center";
+    ctx.fillText("MINE", px+TILE/2, py+TILE-1);
+    ctx.fillStyle = "#46362b"; ctx.fillRect(px+2, py+6, TILE-4, 18);
+    ctx.fillStyle = "#6b513f"; ctx.fillRect(px+2, py+6, TILE-4, 3);
+    ctx.fillStyle = "#111";    ctx.fillRect(px+8, py+2, 16, 12);
+    ctx.fillStyle = "#5ad2ff"; ctx.fillRect(px+9, py+3, 14, 10);
+    if((Math.floor(Date.now()/300)+x+y)%3===0){
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(px+10, py+5, 4, 1); ctx.fillRect(px+10, py+8, 8, 1); ctx.fillRect(px+10, py+11, 6, 1);
+    }
+    ctx.fillStyle = "#1a1a22"; ctx.fillRect(px+10, py+24, 12, 6);
+  } else if(t==="M"){
+    ctx.fillStyle = "#2a2430"; ctx.fillRect(px,py,TILE,TILE);
+    ctx.fillStyle = "#5c4a6e"; ctx.fillRect(px+1, py+1, TILE-2, TILE-2);
+    ctx.fillStyle = "#33293f"; ctx.fillRect(px+4, py+4, TILE-8, TILE-8);
+    ctx.fillStyle = "#d8d2c4"; ctx.fillRect(px+6, py+8, 6, 4); ctx.fillRect(px+16, py+14, 8, 5);
+  } else if(t==="S"){
+    /* 男睡眠仓 */
+    ctx.fillStyle = "#1a2c3a"; ctx.fillRect(px+2, py+4, TILE-4, TILE-8);
+    ctx.fillStyle = "#2a465c"; ctx.fillRect(px+3, py+5, TILE-6, TILE-10);
+    ctx.fillStyle = "#7bd3ff";
+    ctx.globalAlpha = 0.5 + Math.sin(Date.now()/500 + x)*0.2;
+    ctx.fillRect(px+6, py+8, TILE-12, 8);
+    ctx.globalAlpha = 1;
+    /* ♂ */
+    ctx.fillStyle = "#9bd4ff";
+    ctx.font = "9px monospace"; ctx.textAlign = "center";
+    ctx.fillText("♂", px+TILE/2, py+TILE-3);
+  } else if(t==="Q"){
+    /* 女睡眠仓 */
+    ctx.fillStyle = "#3a1a2c"; ctx.fillRect(px+2, py+4, TILE-4, TILE-8);
+    ctx.fillStyle = "#5c2a46"; ctx.fillRect(px+3, py+5, TILE-6, TILE-10);
+    ctx.fillStyle = "#ff9bd4";
+    ctx.globalAlpha = 0.5 + Math.sin(Date.now()/500 + x + 1)*0.2;
+    ctx.fillRect(px+6, py+8, TILE-12, 8);
+    ctx.globalAlpha = 1;
+    /* ♀ */
+    ctx.fillStyle = "#ff9bd4";
+    ctx.font = "9px monospace"; ctx.textAlign = "center";
+    ctx.fillText("♀", px+TILE/2, py+TILE-3);
+  } else if(t==="C"){
+    ctx.fillStyle = "#1a1a1a"; ctx.fillRect(px+4, py+2, TILE-8, TILE-4);
+    ctx.fillStyle = "#2a2a2a"; ctx.fillRect(px+6, py+6, TILE-12, 12);
+    ctx.fillStyle = "#7b3f1f"; ctx.fillRect(px+10, py+18, TILE-20, 4);
+    if(Math.floor(Date.now()/300)%2===0){
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.fillRect(px+12, py-2, 2, 6); ctx.fillRect(px+18, py-4, 2, 8);
+    }
+  } else if(t==="P"){
+    ctx.fillStyle = "#c9c9c9"; ctx.fillRect(px+3, py+8, TILE-6, 14);
+    ctx.fillStyle = "#606060"; ctx.fillRect(px+4, py+9, TILE-8, 3);
+    ctx.fillStyle = "#202020"; ctx.fillRect(px+4, py+16, TILE-8, 2);
+    ctx.fillStyle = (Math.floor(Date.now()/400)%2===0) ? "#4aff4a" : "#1a6a1a";
+    ctx.fillRect(px+TILE-8, py+10, 2, 2);
+  } else if(t==="B"){
+    ctx.fillStyle = "#ecece4"; ctx.fillRect(px+2, py+4, TILE-4, TILE-10);
+    ctx.strokeStyle = "#888"; ctx.strokeRect(px+2, py+4, TILE-4, TILE-10);
+    ctx.fillStyle = "#d02020"; ctx.fillRect(px+6, py+20, 12, 1);
+    ctx.fillStyle = "#222"; ctx.fillRect(px+6, py+8, 14, 1); ctx.fillRect(px+6, py+12, 10, 1); ctx.fillRect(px+6, py+16, 18, 1);
+  } else if(t==="m"){
+    ctx.fillStyle = "#3a3a4a"; ctx.fillRect(px+2, py+2, TILE-4, TILE-4);
+    ctx.fillStyle = "#a0b0c8"; ctx.fillRect(px+4, py+4, TILE-8, TILE-8);
+    ctx.fillStyle = "#5a6a88"; ctx.fillRect(px+12, py+10, 6, 10); ctx.fillRect(px+13, py+8, 4, 3);
+  } else if(t==="w"){
+    ctx.fillStyle = "#1a2a4a"; ctx.fillRect(px,py,TILE,TILE);
+    const g = ctx.createLinearGradient(0,py,0,py+TILE);
+    g.addColorStop(0, "#ffb070"); g.addColorStop(0.5,"#ff7050"); g.addColorStop(1, "#1a1a3a");
+    ctx.fillStyle = g; ctx.fillRect(px+3, py+3, TILE-6, TILE-6);
+    ctx.strokeStyle = "#fff"; ctx.strokeRect(px+3, py+3, TILE-6, TILE-6);
+    ctx.strokeRect(px+3, py+3, (TILE-6)/2, TILE-6);
+    const ap = (Date.now()/40 % TILE);
+    ctx.fillStyle = "#fff"; ctx.fillRect(px+3+ap%(TILE-8), py+10, 2, 1);
+  } else if(t==="E"){
+    ctx.fillStyle = "#252035"; ctx.fillRect(px,py,TILE,TILE);
+    ctx.fillStyle = "#3a3050"; ctx.fillRect(px+4, py+4, TILE-8, TILE-8);
+    ctx.fillStyle = "#ffe100";
+    ctx.fillRect(px+TILE/2-2, py+TILE/2-5, 4, 2);
+    ctx.fillRect(px+TILE/2-3, py+TILE/2-3, 6, 2);
+    ctx.fillRect(px+TILE/2-2, py+TILE/2-1, 4, 2);
+  } else if(t==="T"){
+    /* 马桶 */
+    ctx.fillStyle = "#ddd"; ctx.fillRect(px+8, py+10, 16, 14);
+    ctx.fillStyle = "#aaa"; ctx.fillRect(px+10, py+12, 12, 8);
+    ctx.fillStyle = "#222"; ctx.fillRect(px+10, py+14, 12, 4);
+    ctx.fillStyle = "#ddd"; ctx.fillRect(px+8, py+4, 16, 6);
+  } else if(t==="L"){
+    /* 沙发 / 上网 */
+    ctx.fillStyle = "#3a2c46"; ctx.fillRect(px+2, py+10, TILE-4, 16);
+    ctx.fillStyle = "#5a4666"; ctx.fillRect(px+2, py+10, TILE-4, 4);
+    ctx.fillStyle = "#7b3f8c"; ctx.fillRect(px+6, py+14, 4, 8); ctx.fillRect(px+22, py+14, 4, 8);
+    if((Math.floor(Date.now()/500))%2===0){
+      ctx.fillStyle = "#5ad2ff";
+      ctx.fillRect(px+12, py+4, 8, 4);
+    }
+  } else if(t==="R"){
+    /* 前台桌 */
+    ctx.fillStyle = "#46362b"; ctx.fillRect(px+2, py+8, TILE-4, 16);
+    ctx.fillStyle = "#6b513f"; ctx.fillRect(px+2, py+8, TILE-4, 4);
+    ctx.fillStyle = "#ffe100"; ctx.fillRect(px+8, py+14, TILE-16, 2);
+    ctx.fillStyle = "#fff"; ctx.font = "8px monospace"; ctx.textAlign="center";
+    ctx.fillText("前台", px+TILE/2, py+24);
+  } else if(t==="N"){
+    /* 公告板 */
+    ctx.fillStyle = "#3a2c2c"; ctx.fillRect(px+2, py+4, TILE-4, TILE-10);
+    ctx.fillStyle = "#fff8e0"; ctx.fillRect(px+5, py+7, 8, 6);
+    ctx.fillStyle = "#fff8e0"; ctx.fillRect(px+15, py+10, 10, 8);
+    ctx.fillStyle = "#222"; ctx.fillRect(px+6, py+9, 5, 1);
+    ctx.fillStyle = "#222"; ctx.fillRect(px+16, py+13, 7, 1);
+  } else if(t==="g"){
+    /* 跑步机 */
+    ctx.fillStyle = "#222"; ctx.fillRect(px+2, py+18, TILE-4, 8);
+    ctx.fillStyle = "#444"; ctx.fillRect(px+4, py+18, TILE-8, 2);
+    ctx.fillStyle = "#666"; ctx.fillRect(px+12, py+4, 8, 14);
+    ctx.fillStyle = (Math.floor(Date.now()/400)%2===0) ? "#5ad2ff" : "#1a4a6a";
+    ctx.fillRect(px+14, py+6, 4, 3);
+  } else if(t==="X"){
+    /* 烟灰缸 */
+    ctx.fillStyle = "#222"; ctx.fillRect(px+8, py+18, TILE-16, 6);
+    ctx.fillStyle = "#444"; ctx.fillRect(px+10, py+16, TILE-20, 2);
+    ctx.fillStyle = "rgba(200,200,200,0.5)";
+    const sm = Math.sin(Date.now()/300+x);
+    ctx.fillRect(px+TILE/2-1+sm*2, py+10, 2, 6);
+    ctx.fillRect(px+TILE/2-1+sm*2, py+5, 2, 4);
+  } else if(t==="r"){
+    /* 天台栏杆 */
+    ctx.fillStyle = "#252035"; ctx.fillRect(px,py+TILE-12,TILE,12);
+    ctx.fillStyle = "#3a3050"; ctx.fillRect(px,py+TILE-12,TILE,2);
+    ctx.fillStyle = "#11141a"; ctx.fillRect(px+4, py+TILE-10, 2, 10);
+    ctx.fillStyle = "#11141a"; ctx.fillRect(px+TILE-6, py+TILE-10, 2, 10);
+  }
+}
+
+/* drawHumanoid: longHair adds shoulder-length hair lines */
+function drawHumanoid(px, py, body, hair, dir, walk, longHair){
+  const skin="#ffd0b0";
+  /* 头发顶部 */
+  ctx.fillStyle = hair; ctx.fillRect(px+9, py+4, 12, 4);
+  /* 长发 */
+  if(longHair){
+    ctx.fillStyle = hair;
+    ctx.fillRect(px+8, py+5, 2, 13);
+    ctx.fillRect(px+22, py+5, 2, 13);
+    ctx.fillRect(px+9, py+16, 12, 2); /* hair tail behind shoulder */
+  }
+  /* 脸 */
+  ctx.fillStyle = skin; ctx.fillRect(px+10, py+8, 10, 7);
+  if(dir==="left"){ ctx.fillStyle="#000"; ctx.fillRect(px+11, py+10, 2, 2); }
+  else if(dir==="right"){ ctx.fillStyle="#000"; ctx.fillRect(px+17, py+10, 2, 2); }
+  else if(dir==="up"){ ctx.fillStyle = hair; ctx.fillRect(px+10, py+8, 10, 5); }
+  else { ctx.fillStyle="#000"; ctx.fillRect(px+12, py+11, 2, 2); ctx.fillRect(px+16, py+11, 2, 2); }
+  /* 身体 */
+  ctx.fillStyle = body; ctx.fillRect(px+9, py+15, 12, 9);
+  ctx.fillRect(px+7, py+16, 2, 7); ctx.fillRect(px+21, py+16, 2, 7);
+  /* 脚 */
+  const off = walk ? 1 : 0;
+  ctx.fillStyle = "#1a1a22";
+  ctx.fillRect(px+10, py+24, 4, 5+off);
+  ctx.fillRect(px+16, py+24, 4, 5-off);
+}
+
+function drawPlayer(ox, oy){
+  const p = state.player;
+  const phase = p.moving ? Math.floor(Date.now()/100)%2 : 0;
+  const px = p.px + ox, py = p.py + oy;
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.beginPath(); ctx.ellipse(px+TILE/2, py+TILE-4, 8, 3, 0, 0, Math.PI*2); ctx.fill();
+  drawHumanoid(px, py, "#e6d490", "#3a2a18", p.dir, phase, true);
+  ctx.fillStyle = "#fff"; ctx.font = "8px monospace"; ctx.textAlign = "center";
+  ctx.fillText("YOU", px+TILE/2, py-1);
+}
+function drawNPC(n, gx, gy, ox, oy){
+  const px = gx*TILE + ox, py = gy*TILE + oy;
+  const phase = (Math.floor(Date.now()/400)+gx)%2;
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.beginPath(); ctx.ellipse(px+TILE/2, py+TILE-4, 8, 3, 0, 0, Math.PI*2); ctx.fill();
+  drawHumanoid(px, py, n.color, n.hair, "down", phase, false);
+  ctx.fillStyle = "#a0a0a0"; ctx.font = "8px monospace"; ctx.textAlign = "center";
+  const short = (n.name||"").split(" / ")[0];
+  ctx.fillText(short, px+TILE/2, py-1);
+}
+function drawInteractHint(ox, oy){
+  if(scene || state.gameOver || titleShown || mbtiSetupOn || daySummaryShown ||
+     mapViewOpen || state.pendingDoor) return;
+  const p = state.player;
+  if(p.moving) return;
+  const r = currentRoom();
+  const [dx,dy] = dirVec(p.dir);
+  const tx = p.x+dx, ty = p.y+dy;
+  if(tx<0 || ty<0 || ty>=r.h || tx>=r.w) return;
+  const n = npcHere(tx,ty);
+  const t = tileAt(r, tx, ty);
+  let label = null;
+  if(n) label = "[ Z ] 对话";
+  else {
+    const eLabel = (state.canEndDay && state.hour>=18) ? "下班 · 电梯" : "电梯";
+    const tileLabels = {
+      F:"电脑 · 项目", D:"同事工位", M:"会议桌",
+      S:"♂ 睡眠仓", Q:"♀ 睡眠仓", T:"洗手间",
+      C:"咖啡机", P:"打印机", B:"留言板", L:"沙发 · 上网",
+      m:"镜子", w:"窗户", E:eLabel,
+      R:"前台",  g:"跑步机", X:"烟灰缸", r:"天台 · 看远处",
+      "+":"门",
+    };
+    if(tileLabels[t]) label = "[ Z ] " + tileLabels[t];
+  }
+  if(!label) return;
+  const bx = tx*TILE + TILE/2 + ox;
+  const by = ty*TILE - 3 + oy + Math.sin(Date.now()/200)*1.5;
+  ctx.fillStyle = "#ffe100";
+  ctx.beginPath(); ctx.moveTo(bx-4, by-6); ctx.lineTo(bx+4, by-6); ctx.lineTo(bx, by); ctx.fill();
+  ctx.fillStyle = "rgba(0,0,0,0.78)"; ctx.fillRect(4, cvs.height-18, 240, 14);
+  ctx.strokeStyle = "#fff"; ctx.strokeRect(4, cvs.height-18, 240, 14);
+  ctx.fillStyle = "#ffe100"; ctx.font = "10px monospace"; ctx.textAlign = "left";
+  ctx.fillText(label, 10, cvs.height-8);
+}
+function drawRegionLabel(){
+  const r = regionName();
+  const fl = currentRoom() ? currentRoom().floor : 0;
+  const flStr = fl===9 ? "· 楼顶 ·" : fl===0 ? "· 室外 ·" : "· F"+fl+" ·";
+  const txt = flStr + "  " + r;
+  ctx.fillStyle = "rgba(0,0,0,0.78)";
+  const tw = Math.min(220, txt.length * 10 + 24);
+  ctx.fillRect(cvs.width-tw-4, 4, tw, 16);
+  ctx.strokeStyle = "#fff"; ctx.strokeRect(cvs.width-tw-4, 4, tw, 16);
+  ctx.fillStyle = "#fff"; ctx.font = "10px monospace"; ctx.textAlign = "right";
+  ctx.fillText(txt, cvs.width-10, 15);
+}
+function drawFloaters(){
+  for(const f of floaters){
+    f.life--;
+    ctx.globalAlpha = Math.min(1, f.life/30);
+    ctx.fillStyle = "#ffe100";
+    ctx.font = "12px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(f.t, f.x, f.y - (90-f.life)*0.4);
+    ctx.globalAlpha = 1;
+  }
+  floaters = floaters.filter(f=>f.life>0);
+}
+function drawStateVignette(){
+  /* 视觉效果绑定到特殊状态 */
+  if(!state.specialState) return;
+  const n = state.specialState.name;
+  if(n === "depressed"){
+    const grad = ctx.createRadialGradient(cvs.width/2, cvs.height/2, 80, cvs.width/2, cvs.height/2, cvs.width/1.1);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(1, "rgba(10,0,20,0.6)");
+    ctx.fillStyle = grad; ctx.fillRect(0,0,cvs.width,cvs.height);
+  } else if(n === "manic"){
+    /* 微弱的彩色描边 */
+    if(Math.random() < 0.04){
+      ctx.globalAlpha = 0.3; ctx.fillStyle = "#ff77cc";
+      ctx.fillRect(0, Math.random()*cvs.height|0, cvs.width, 1);
+      ctx.globalAlpha = 1;
+    }
+  } else if(n === "hallu"){
+    const scans = 8;
+    ctx.globalAlpha = 0.35; ctx.fillStyle = "#ff00aa";
+    for(let i=0;i<scans;i++){
+      const yy = Math.floor(Math.random()*cvs.height);
+      ctx.fillRect(0, yy, cvs.width, 1);
+    }
+    ctx.globalAlpha = 1;
+    if(Math.random() < 0.12){
+      const yy = Math.floor(Math.random()*cvs.height);
+      const h = 8 + Math.floor(Math.random()*16);
+      const off = (Math.random()<0.5?-1:1)*(2+Math.random()*6);
+      try{
+        const imgData = ctx.getImageData(0, yy, cvs.width, h);
+        ctx.putImageData(imgData, off, yy);
+      }catch(e){}
+    }
+  } else if(n === "drunk"){
+    ctx.globalAlpha = 0.35; ctx.fillStyle = "#5ad2ff";
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function tick(){
+  updateMovement();
+  draw();
+  requestAnimationFrame(tick);
+}
+
+/* ===================== INPUT ===================== */
+/* 开场四段：bootSeq → title → mbtiIntro → mbtiSetup */
+let bootSeqOn   = true;
+let bootReady   = false;   /* 文本已逐行点亮完毕，可以进 title */
+let titleShown  = false;
+let mbtiIntroOn = false;
+let mbtiSetupOn = false;
+
+/* —— BOOT 序列 —— */
+let bootStarted = false;
+function startBootSequence(){
+  if(bootStarted) return;
+  bootStarted = true;
+  const el = document.getElementById("bootSeq");
+  if(!el){ leaveBoot(); return; }
+  const lines = el.querySelectorAll(".line");
+  const press = document.getElementById("bootPress");
+  let i = 0;
+  function revealNext(){
+    if(i >= lines.length){
+      if(press) press.classList.add("show");
+      bootReady = true;
+      return;
+    }
+    lines[i].classList.add("show");
+    i++;
+    /* 模拟年代感: 几行慢一点抖一下 */
+    const delay = (i===4||i===5||i===7||i===9) ? 560 : 260;
+    setTimeout(revealNext, delay);
+  }
+  revealNext();
+}
+function skipBoot(){
+  if(!bootSeqOn) return;
+  /* 第一次按键: 全部一次性显示; 第二次按键才进 title */
+  if(!bootReady){
+    const el = document.getElementById("bootSeq");
+    if(el) el.querySelectorAll(".line").forEach(l=>l.classList.add("show"));
+    const press = document.getElementById("bootPress");
+    if(press) press.classList.add("show");
+    bootReady = true;
+    return;
+  }
+  leaveBoot();
+}
+function leaveBoot(){
+  if(!bootSeqOn) return;
+  bootSeqOn = false;
+  const el = document.getElementById("bootSeq");
+  if(el) el.classList.add("hide");
+  showTitleMenu();
+}
+
+/* ===== 标题菜单 (v0.7.0.0.5) ===== */
+let titleMenuSel = 0;
+const TITLE_MENU_IDS = ["btnContinue","btnNew","btnDict","btnAchv"];
+function showTitleMenu(){
+  titleShown = true;
+  document.getElementById("title").classList.remove("hide");
+  document.getElementById("title").classList.add("show");
+  /* 没有存档时, "继续" 灰; 默认聚焦"开新周目" */
+  const has = hasRunSave();
+  const btnC = document.getElementById("btnContinue");
+  if(btnC) btnC.classList.toggle("dim", !has);
+  titleMenuSel = has ? 0 : 1;
+  /* 第 N 周目展示 */
+  const tag = document.getElementById("runTag");
+  if(tag){
+    tag.innerText = "·  第 " + (META.finishedRuns + 1) + " 周目  ·  已得成就 " +
+      META.achievements.size + " / " + Object.keys(ACHIEVEMENTS).length + "  ·";
+  }
+  renderTitleMenu();
+}
+function renderTitleMenu(){
+  TITLE_MENU_IDS.forEach((id, i)=>{
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle("sel", i === titleMenuSel);
+  });
+}
+function moveTitleMenu(d){
+  const has = hasRunSave();
+  for(let k=0;k<TITLE_MENU_IDS.length;k++){
+    titleMenuSel = (titleMenuSel + d + TITLE_MENU_IDS.length) % TITLE_MENU_IDS.length;
+    if(titleMenuSel === 0 && !has) continue;
+    break;
+  }
+  renderTitleMenu();
+}
+function pickTitleMenu(){
+  const id = TITLE_MENU_IDS[titleMenuSel];
+  if(id === "btnContinue"){
+    if(!hasRunSave()) return;
+    continueRun();
+  } else if(id === "btnNew"){
+    clearRunSave();
+    leaveTitle();
+  } else if(id === "btnDict"){
+    openDict();
+  } else if(id === "btnAchv"){
+    openAchv();
+  }
+}
+function leaveTitle(){
+  if(!titleShown) return;
+  titleShown = false;
+  const t = document.getElementById("title");
+  if(t){ t.classList.remove("show"); t.classList.add("hide"); }
+  if(!META.achievements.has("first_run")) achv("first_run");
+  showMbtiIntro();
+}
+
+/* ===== "继续" : 加载存档, 跳过 MBTI 直接回到游戏 ===== */
+function continueRun(){
+  const snap = loadRun();
+  if(!snap){ /* 兜底 */ leaveTitle(); return; }
+  /* 用 snapshot 还原 state */
+  state = freshState();
+  for(const k in snap){
+    if(k === "unlockedJargon" || k === "abnormalsHit") continue;
+    state[k] = snap[k];
+  }
+  state.unlockedJargon = new Set([...(snap.unlockedJargon||[]), ...META.dictUnlocked]);
+  state.abnormalsHit   = new Set(snap.abnormalsHit || []);
+  if(!state.elevatorAfterworkUsed) state.elevatorAfterworkUsed = {};
+  if(!state.projectFocus){
+    state.projectFocus = { art:0, qa:0, program:0, design:0, system:0, experience:0, coordination:0 };
+  }
+  if(state.anxietyActive === undefined) state.anxietyActive = false;
+  if(state.anxietyRestDays === undefined) state.anxietyRestDays = 0;
+  if(state.overtimeStreak === undefined) state.overtimeStreak = 0;
+  ensureNpcSocialState();
+  state.runStarted     = true;
+  /* 关掉所有开场层 */
+  titleShown = false; mbtiIntroOn = false; mbtiSetupOn = false;
+  document.getElementById("title").classList.remove("show");
+  document.getElementById("title").classList.add("hide");
+  document.getElementById("mbtiIntro").classList.remove("show");
+  document.getElementById("mbtiSetup").classList.remove("show");
+  /* 同步 田 NPC schedule (周目刚开始 == day1 9点) */
+  updateHUD(); draw();
+  showToast("载入存档：DAY " + state.day + " · " + String(state.hour).padStart(2,"0") + ":" + String(state.minute).padStart(2,"0"));
+}
+
+/* ===== 黑话字典 / 成就 视图 ===== */
+let dictOpen = false, achvOpen = false;
+function openDict(){
+  dictOpen = true;
+  const grid = document.getElementById("dictGrid");
+  grid.innerHTML = "";
+  let known = 0;
+  for(const w of ALL_JARGON){
+    const u = META.dictUnlocked.has(w);
+    if(u) known++;
+    const item = document.createElement("div");
+    item.className = "dItem" + (u ? "" : " locked");
+    const word = document.createElement("div");
+    word.className = "word";
+    word.innerText = u ? w : "█ █ █";
+    const def = document.createElement("div");
+    def.className = "def";
+    def.innerText = u ? (JARGON_DEFS[w] || "—") : "（在 NPC 嘴里听到过它，才会显形。）";
+    item.appendChild(word); item.appendChild(def);
+    grid.appendChild(item);
+  }
+  document.getElementById("dictStats").innerText =
+    "已解锁  " + known + "  /  " + ALL_JARGON.length + "  ·  跨周目持久";
+  document.getElementById("dictView").classList.add("show");
+}
+function closeDict(){
+  dictOpen = false;
+  document.getElementById("dictView").classList.remove("show");
+}
+function openAchv(){
+  achvOpen = true;
+  const grid = document.getElementById("achvGrid");
+  grid.innerHTML = "";
+  const ids = Object.keys(ACHIEVEMENTS);
+  let got = 0;
+  for(const id of ids){
+    const a = ACHIEVEMENTS[id];
+    const u = META.achievements.has(id);
+    if(u) got++;
+    const it = document.createElement("div");
+    it.className = "aItem " + (u ? "unlocked" : "locked");
+    const n = document.createElement("div"); n.className="name";
+    n.innerText = u ? a.name : "? ? ? ?";
+    const d = document.createElement("div"); d.className="desc";
+    d.innerText = u ? a.desc : "（继续玩下去，也许会出现。）";
+    it.appendChild(n); it.appendChild(d);
+    grid.appendChild(it);
+  }
+  document.getElementById("achvStats").innerText =
+    "已解锁  " + got + "  /  " + ids.length + "  ·  累计完成 " + META.finishedRuns + " 周目";
+  document.getElementById("achvView").classList.add("show");
+}
+function closeAchv(){
+  achvOpen = false;
+  document.getElementById("achvView").classList.remove("show");
+}
+function leaveMbtiIntro(){
+  if(!mbtiIntroOn) return;
+  mbtiIntroOn = false;
+  const el = document.getElementById("mbtiIntro");
+  if(el) el.classList.remove("show");
+  showMbtiSetup();
+}
+function showMbtiIntro(){
+  mbtiIntroOn = true;
+  document.getElementById("mbtiIntro").classList.add("show");
+}
+
+/* —— 鼠标点击托底 ——
+   每个开场页面绑定 click，title / intro 内还塞了真正的 <button>。
+   bootSeq 整页点击 = skipBoot。 */
+function bindOpeningClicksOnce(){
+  if(window.__openingClicksBound) return;
+  window.__openingClicksBound = true;
+  const boot = document.getElementById("bootSeq");
+  if(boot) boot.addEventListener("click", function(){ skipBoot(); });
+  /* 标题菜单 4 个按钮: 鼠标点击直接执行 */
+  TITLE_MENU_IDS.forEach((id, i)=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener("click", function(ev){
+      ev.stopPropagation();
+      titleMenuSel = i;
+      renderTitleMenu();
+      pickTitleMenu();
+    });
+    el.addEventListener("mouseenter", function(){
+      titleMenuSel = i; renderTitleMenu();
+    });
+  });
+  const intro = document.getElementById("mbtiIntro");
+  if(intro) intro.addEventListener("click", function(){ leaveMbtiIntro(); });
+  const ib = document.getElementById("introNextBtn");
+  if(ib) ib.addEventListener("click", function(ev){ ev.stopPropagation(); leaveMbtiIntro(); });
+  /* 字典/成就 浮层: 任意点击都关闭 */
+  const dv = document.getElementById("dictView");
+  if(dv) dv.addEventListener("click", function(){ closeDict(); });
+  const av = document.getElementById("achvView");
+  if(av) av.addEventListener("click", function(){ closeAchv(); });
+}
+
+function bootOpening(){
+  bindOpeningClicksOnce();
+  startBootSequence();
+}
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", bootOpening);
+} else {
+  bootOpening();
+}
+
+const QUESTIONS = [
+  { letter:["E","I"],
+    title:"你的角色更倾向于……",
+    desc:"想象 Ta 一周里最舒服的一种状态。",
+    opts:[
+      {key:"E", title:"E", text:"和人在一起会被充电。\n下班想约朋友吃宵夜。"},
+      {key:"I", title:"I", text:"和人在一起会被消耗。\n下班想关上门什么都不做。"},
+    ]},
+  { letter:["N","S"],
+    title:"Ta 看到一份新东西，第一反应是……",
+    desc:"模式 vs 细节。",
+    opts:[
+      {key:"N", title:"N", text:"看到模式、隐喻、可能性。\n喜欢问\"它能变成什么\"。"},
+      {key:"S", title:"S", text:"看到事实、细节、当前状态。\n喜欢问\"它现在到底是什么\"。"},
+    ]},
+  { letter:["T","F"],
+    title:"做决定的时候 Ta 主要靠……",
+    desc:"逻辑 vs 价值。",
+    opts:[
+      {key:"T", title:"T", text:"逻辑一致性。\n\"对就是对，错就是错。\""},
+      {key:"F", title:"F", text:"价值一致性。\n\"我能不能接受这件事。\""},
+    ]},
+  { letter:["J","P"],
+    title:"对未来 Ta 偏好……",
+    desc:"决断 vs 开放。",
+    opts:[
+      {key:"J", title:"J", text:"早点把事情定下来。\n清单和计划让 Ta 安心。"},
+      {key:"P", title:"P", text:"先开放着看。\n保持选项让 Ta 安心。"},
+    ]},
+];
+let qIdx = 0, qSel = 0, mbtiAnswers = [];
+
+function showMbtiSetup(){
+  mbtiSetupOn = true;
+  document.getElementById("mbtiSetup").classList.add("show");
+  qIdx = 0; qSel = 0; mbtiAnswers = [];
+  renderQuestion();
+}
+function renderQuestion(){
+  const q = QUESTIONS[qIdx];
+  document.getElementById("qno").innerText = "问题 "+(qIdx+1)+" / 4";
+  document.getElementById("qText").innerText = q.title;
+  document.getElementById("qDesc").innerText = q.desc;
+  const opts = document.getElementById("qOpts");
+  opts.innerHTML = "";
+  q.opts.forEach((o, i)=>{
+    const d = document.createElement("div");
+    d.className = "o" + (i===qSel ? " sel":"");
+    d.innerHTML = "<b>"+o.title+"</b>"+escHtml(o.text).replace(/\n/g,"<br>");
+    d.onclick = ()=>{ qSel = i; renderQuestion(); confirmAnswer(); };
+    opts.appendChild(d);
+  });
+  const prog = document.getElementById("progress");
+  prog.innerHTML = "";
+  for(let i=0;i<4;i++){
+    const s = document.createElement("span");
+    if(i<qIdx) s.className = "done";
+    prog.appendChild(s);
+  }
+}
+function confirmAnswer(){
+  const q = QUESTIONS[qIdx];
+  mbtiAnswers.push(q.opts[qSel].key);
+  qIdx++;
+  if(qIdx >= QUESTIONS.length){
+    const m = mbtiAnswers.join("");
+    state.mbti = m;
+    state.functions = initFromMBTI(m);
+    state.runStarted = true;
+    document.getElementById("mbtiSetup").classList.remove("show");
+    mbtiSetupOn = false;
+    saveRun();
+    /* 开场剧情 */
+    runScene([
+      {type:"say", name:"系统",
+       text:"——  你给 Ta 设了一种类型："+m+"  ——\n\n（这只是一个起点。\n几天之后，Ta 可能就不是这种人了。）"},
+      {type:"say", name:"系统",
+       text:"金属壳的盖子打开了。\n你看见自己的手——\n不太像自己的。"},
+      {type:"say", name:"系统",
+       text:"舱壳上贴着「♂」。\n你不记得昨晚是怎么进去的。\n你也不记得自己叫什么。\n\n但你的本能在告诉身体：\n9 点要打卡。"},
+      {type:"say", name:"系统",
+       text:"——  第 1 天 · MON · 09:00  ——\n（去和站在外面的男同事说一句话。\n他可能比你更困惑。）"},
+    ]);
+    updateHUD();
+  } else {
+    qSel = 0;
+    renderQuestion();
+  }
+}
+
+const GAME_KEYS = new Set([" ","Enter","Tab","Escape",
+  "ArrowUp","ArrowDown","ArrowLeft","ArrowRight",
+  "z","Z","x","X","w","W","a","A","s","S","d","D","m","M","Tab"]);
+
+function handleKeydown(e){
+  /* 开场页面不 preventDefault, 避免某些 Safari 下 file:// 怪异焦点行为 */
+  if(bootSeqOn){
+    /* 任何键都推进 boot (第一次=全显, 第二次=进 title) */
+    e.preventDefault();
+    skipBoot();
+    return;
+  }
+  if(titleShown){
+    if(dictOpen){
+      if(e.key==="x"||e.key==="X"||e.key==="Escape"||e.key==="Enter"||e.key==="z"||e.key==="Z"){
+        e.preventDefault(); closeDict();
+      }
+      return;
+    }
+    if(achvOpen){
+      if(e.key==="x"||e.key==="X"||e.key==="Escape"||e.key==="Enter"||e.key==="z"||e.key==="Z"){
+        e.preventDefault(); closeAchv();
+      }
+      return;
+    }
+    if(e.key==="ArrowUp"||e.key==="w"||e.key==="W"){
+      e.preventDefault(); moveTitleMenu(-1); return;
+    }
+    if(e.key==="ArrowDown"||e.key==="s"||e.key==="S"){
+      e.preventDefault(); moveTitleMenu(1); return;
+    }
+    if(e.key==="z"||e.key==="Z"||e.key==="Enter"||e.key===" "){
+      e.preventDefault(); pickTitleMenu(); return;
+    }
+    return;
+  }
+  if(mbtiIntroOn){
+    if(e.key==="z"||e.key==="Z"||e.key==="Enter"||e.key===" "){
+      e.preventDefault();
+      leaveMbtiIntro();
+    }
+    return;
+  }
+  if(GAME_KEYS.has(e.key)) e.preventDefault();
+  if(mbtiSetupOn){
+    if(e.key==="ArrowLeft"||e.key==="a"||e.key==="A"){ qSel = 0; renderQuestion(); return; }
+    if(e.key==="ArrowRight"||e.key==="d"||e.key==="D"){ qSel = 1; renderQuestion(); return; }
+    if(e.key==="z"||e.key==="Z"||e.key==="Enter"){ confirmAnswer(); return; }
+    return;
+  }
+  if(daySummaryShown){
+    if(e.key==="z"||e.key==="Z"||e.key==="Enter"){ dismissDaySummary(); }
+    return;
+  }
+  if(scheduleOpen){
+    if(e.key==="Tab"||e.key==="x"||e.key==="X"||e.key==="Escape"){ closeSchedule(); }
+    return;
+  }
+  if(mapViewOpen){
+    if(e.key==="m"||e.key==="M"||e.key==="x"||e.key==="X"||e.key==="Escape"){ closeMapView(); }
+    return;
+  }
+  if(state.pendingDoor){
+    if(e.key==="z"||e.key==="Z"||e.key==="Enter"){ confirmDoor(); return; }
+    if(e.key==="x"||e.key==="X"||e.key==="Escape"){ cancelDoor(); return; }
+    return;
+  }
+  if(state.gameOver) return;
+  if(e.key==="Tab"){ openSchedule(); return; }
+  if(e.key==="m"||e.key==="M"){ openMapView(); return; }
+  if(scene){
+    if(pendingChoiceOpts){
+      if(e.key==="ArrowUp"||e.key==="w"||e.key==="W"){ moveChoice(-1); return; }
+      if(e.key==="ArrowDown"||e.key==="s"||e.key==="S"){ moveChoice(1); return; }
+      if(e.key==="z"||e.key==="Z"||e.key==="Enter"){
+        if(!typingDone){ forceFinishTyping(); return; }
+        pickChoice(); return;
+      }
+      return;
+    }
+    if(e.key==="z"||e.key==="Z"||e.key==="Enter"||e.key===" "){
+      if(!typingDone) forceFinishTyping();
+      else nextStep();
+      return;
+    }
+    if(e.key==="x"||e.key==="X"||e.key==="Escape"){
+      if(!typingDone) forceFinishTyping();
+      else nextStep();
+      return;
+    }
+    return;
+  }
+  const k = e.key;
+  if(k==="ArrowUp"||k==="w"||k==="W")    held.up = true;
+  else if(k==="ArrowDown"||k==="s"||k==="S")  held.down = true;
+  else if(k==="ArrowLeft"||k==="a"||k==="A")  held.left = true;
+  else if(k==="ArrowRight"||k==="d"||k==="D") held.right = true;
+  else if(k==="z"||k==="Z"||k==="Enter"){ tryInteract(); }
+}
+/* 单点绑定到 window，capture:true 保证最早阶段拿到。
+   再让 body 强制拿焦点，避免本地 file:// 时焦点停留在地址栏导致 keydown 不触发。 */
+window.addEventListener("keydown", handleKeydown, true);
+function ensureFocus(){
+  try {
+    if(document.body){
+      document.body.tabIndex = -1;
+      document.body.focus();
+    }
+  } catch(_){}
+}
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", ensureFocus);
+} else {
+  ensureFocus();
+}
+/* 用户切回窗口时也再抓一次焦点 */
+window.addEventListener("focus", ensureFocus);
+window.addEventListener("click", ensureFocus);
+
+function handleKeyup(e){
+  const k = e.key;
+  if(k==="ArrowUp"||k==="w"||k==="W")    held.up = false;
+  if(k==="ArrowDown"||k==="s"||k==="S")  held.down = false;
+  if(k==="ArrowLeft"||k==="a"||k==="A")  held.left = false;
+  if(k==="ArrowRight"||k==="d"||k==="D") held.right = false;
+}
+window.addEventListener("keyup", handleKeyup);
+
+/* ===================== BOOT ===================== */
+updateHUD();
+tick();
+</script>
+
+</body>
+</html>
