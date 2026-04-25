@@ -1000,9 +1000,9 @@ const ROOMS = {
     name:"茶水间", floor:2, w:11, h:6,
     grid:[
       "###########",
-      "#.CC.....B#",
-      "#....k...L#",
-      "#....k....#",
+      "#.CCkk...B#",
+      "#........L#",
+      "#.........#",
       "#####+#####",
       "###########",
     ],
@@ -1078,7 +1078,7 @@ const ROOMS = {
       "#R..........N#",
       "#............#",
       "#............#",
-      "+...EE......+",
+      "+...EE.......+",
       "#............#",
       "#......+.....#",
       "##############",
@@ -2581,6 +2581,8 @@ function attemptStep(){
   const p = state.player;
   if(p.moving || scene || state.gameOver || titleShown || mbtiSetupOn ||
      daySummaryShown || scheduleOpen || mapViewOpen || state.pendingDoor) return;
+  /* v0.10.1: D1 强制立项流程期间禁止任何自由移动 */
+  if(state.flags && state.flags.day1Locked) return;
   let dir = null;
   if(held.up) dir="up";
   else if(held.down) dir="down";
@@ -3687,10 +3689,6 @@ function interactSleepPod(side){
               text:"你拉上舱门。\n出来的时候，眼睛还是红的。\n但没人会问。"},
             {type:"act", fn:()=>{ advanceMinutes(30); recordMemory("自己其实想哭很久了"); }},
           ]);
-        }},
-        Te:{ text:"算一算今天的进度，决定要不要睡", fn:()=>{
-          inject([
-            {type:"say", name:"*", text:"你算了一下。\n时间不允许。\n你走开了。"}]);
         }},
         /* shadow */
         Ne:{ text:"把睡眠仓当成飞船，幻想自己在去某处", fn:()=>{
@@ -6098,6 +6096,19 @@ function continueRun(){
   document.getElementById("mbtiSetup").classList.remove("show");
   /* 同步 田 NPC schedule (周目刚开始 == day1 9点) */
   updateHUD(); draw();
+  /* v0.10.1: 若存档卡在 D1 强制立项期 → 直接重启 D1 流程，避免玩家被锁住无法行动 */
+  if(state.day === 1 && state.flags && state.flags.day1Locked){
+    showToast("载入存档：D1 立项启动会未完成 — 重新走一遍 D1。");
+    try { changeRoom("male_pod", 1, 2); } catch(e){}
+    state.npcOverride = [{ id:"tian", room:"male_pod", x:3, y:3 }];
+    state.flags.tianAsked = true;
+    runScene([
+      {type:"say", name:"系统",
+       text:"——  续 ·  你又在男睡眠仓里  ——\n（昨天的 D1 没走完。\n你要重新跟田打一次招呼。）"},
+      ...introTianScene(),
+    ]);
+    return;
+  }
   showToast("载入存档：DAY " + state.day + " · " + String(state.hour).padStart(2,"0") + ":" + String(state.minute).padStart(2,"0"));
 }
 
@@ -6283,8 +6294,11 @@ function confirmAnswer(){
     state.runStarted = true;
     document.getElementById("mbtiSetup").classList.remove("show");
     mbtiSetupOn = false;
+    /* v0.10.1: D1 醒来 → 简短独白 → 田自动出现说话 → 直接接 kickoff
+       期间 day1Locked=true，玩家无法自由走动。 */
+    state.flags.day1Locked = true;
+    state.flags.tianAsked = true;  /* 防止后面再触发一次 introTianScene */
     saveRun();
-    /* 开场剧情 */
     runScene([
       {type:"say", name:"系统",
        text:"——  你给 Ta 设了一种类型："+m+"  ——\n\n（这只是一个起点。\n几天之后，Ta 可能就不是这种人了。）"},
@@ -6293,7 +6307,9 @@ function confirmAnswer(){
       {type:"say", name:"系统",
        text:"舱壳上贴着「♂」。\n你不记得昨晚是怎么进去的。\n你也不记得自己叫什么。\n\n但你的本能在告诉身体：\n9 点要打卡。"},
       {type:"say", name:"系统",
-       text:"——  第 1 天 · MON · 09:00  ——\n（去和站在外面的男同事说一句话。\n他可能比你更困惑。）"},
+       text:"——  第 1 天 · MON · 09:00  ——\n（你刚要从舱里坐起来，\n外面有人探头进来。）"},
+      /* 自动接续 introTian 选项分支（不再让玩家走过去触发） */
+      ...introTianScene(),
     ]);
     updateHUD();
   } else {
