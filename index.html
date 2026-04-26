@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>OFFICE — demo v0.8.0.2</title>
+<title>OFFICE — demo v0.8.0.3</title>
 <style>
   html,body{margin:0;padding:0;background:#0a070f;color:#fff;}
   body{
@@ -390,6 +390,39 @@
     text-align:center; color:#7bd0ff; font-size:14px; letter-spacing:3px;
     margin-bottom:18px;
   }
+  /* ===== 个人叙事 / 记忆浏览 ===== */
+  #memoirView .memoirWrap{
+    max-width:980px; margin:0 auto; display:grid; gap:16px;
+  }
+  #memoirView .memoirChapter{
+    background:#100a18; border:1px solid #2a223a; border-radius:12px;
+    padding:18px 20px; line-height:1.85;
+  }
+  #memoirView .memoirChapter.complete{
+    border-color:#ffd166; background:#1a140a;
+  }
+  #memoirView .memoirChapter.missing{
+    opacity:.62; background:#080510;
+  }
+  #memoirView .memoirChapter .ctitle{
+    color:#ffe100; font-size:18px; letter-spacing:5px; margin-bottom:8px;
+  }
+  #memoirView .memoirChapter .body{
+    color:#d8d0e8; font-size:15px; letter-spacing:1px;
+    white-space:pre-line;
+  }
+  #memoirView .memoirChapter .keys{
+    margin-top:10px; color:#7bd0ff; font-size:13px; letter-spacing:2px;
+  }
+  #memoirView .memoirMeta{
+    max-width:980px; margin:20px auto 0; padding:18px 20px;
+    border:1px solid #ff77cc; border-radius:12px;
+    background:#160817; color:#ffc7e8; font-size:15px; line-height:1.85;
+    letter-spacing:1px; white-space:pre-line;
+  }
+  #memoirView .memoirMeta.glitch{
+    color:#ff77cc;
+  }
 
   /* 成就解锁 toast */
   .toastItem.achv{ border-color:#ffd166; color:#ffd166; }
@@ -682,7 +715,7 @@
 </head>
 <body>
 
-<h1 class="logo">OFFICE<small>独角兽网络 · 某 城 · 2026 · demo v0.8.0.2</small></h1>
+<h1 class="logo">OFFICE<small>独角兽网络 · 某 城 · 2026 · demo v0.8.0.3</small></h1>
 
 <div id="hud">
   <div class="group">
@@ -729,7 +762,7 @@
 
 <!-- Boot sequence (90s DOS 风, 不带 CRT 扫描线) -->
 <div id="bootSeq">
-  <div class="line dim" data-line="0">OFFICE.SYS · v0.8.0.2 · build 2026.04</div>
+  <div class="line dim" data-line="0">OFFICE.SYS · v0.8.0.3 · build 2026.04</div>
   <div class="line" data-line="1">&gt; BIOS check ................................. <span class="ok">[ OK ]</span></div>
   <div class="line" data-line="2">&gt; Loading sprites .............................. <span class="ok">[ OK ]</span></div>
   <div class="line" data-line="3">&gt; Loading schedule ............................. <span class="ok">[ OK ]</span></div>
@@ -757,6 +790,7 @@
   <div class="menu" id="titleMenu">
     <button class="menubtn" id="btnContinue" data-act="continue">继 &nbsp; 续 &nbsp; 周 &nbsp; 目</button>
     <button class="menubtn" id="btnNew"      data-act="new">开 &nbsp; 新 &nbsp; 周 &nbsp; 目</button>
+    <button class="menubtn" id="btnMemoir"   data-act="memoir">个 &nbsp; 人 &nbsp; 叙 &nbsp; 事</button>
     <button class="menubtn" id="btnDict"     data-act="dict">黑 &nbsp; 话 &nbsp; 字 &nbsp; 典</button>
     <button class="menubtn" id="btnAchv"     data-act="achv">成 &nbsp; 就 &nbsp; 列 &nbsp; 表</button>
   </div>
@@ -779,6 +813,16 @@
   <div class="sub">每个 4 字成就对应一种结局或一种异常</div>
   <div class="stats" id="achvStats">— / —</div>
   <div class="aGrid" id="achvGrid"></div>
+  <div class="closehint">按 <kbd>X</kbd> / <kbd>Esc</kbd> 关 闭</div>
+</div>
+
+<!-- 个人叙事 / 记忆浏览（跨周目持久化） -->
+<div id="memoirView" class="overlayPanel">
+  <h3>·  个  人  叙  事  ·</h3>
+  <div class="sub">过去记起来的碎片，会在这里拼成一个人</div>
+  <div class="stats" id="memoirStats">— / —</div>
+  <div class="memoirWrap" id="memoirWrap"></div>
+  <div class="memoirMeta" id="memoirMeta">—</div>
   <div class="closehint">按 <kbd>X</kbd> / <kbd>Esc</kbd> 关 闭</div>
 </div>
 
@@ -1411,6 +1455,8 @@ function loadMeta(){
       dictUnlocked: new Set(o.dictUnlocked || []),
       achievements: new Set(o.achievements || []),
       endings:      new Set(o.endings      || []),
+      memories:     new Set(o.memories     || []),
+      personalChoices: o.personalChoices || {},
       runs:         o.runs || 0,
       finishedRuns: o.finishedRuns || 0,
     };
@@ -1423,6 +1469,8 @@ function defaultMeta(){
     dictUnlocked: new Set(),
     achievements: new Set(),
     endings:      new Set(),
+    memories:     new Set(),
+    personalChoices: {},
     runs:         0,
     finishedRuns: 0,
   };
@@ -1433,6 +1481,8 @@ function saveMeta(){
       dictUnlocked: [...META.dictUnlocked],
       achievements: [...META.achievements],
       endings:      [...META.endings],
+      memories:     [...(META.memories || [])],
+      personalChoices: META.personalChoices || {},
       runs:         META.runs,
       finishedRuns: META.finishedRuns,
     }));
@@ -1760,14 +1810,16 @@ function tickState(hours){
 
 /* ===================== STATE ===================== */
 let state = freshState();
-/* v0.9: NG+ 把全部教学解锁前置到 D1，并允许 D2 起就用二级方向 */
+/* v0.10.3: NG+ 只能解锁 meta 内容/荣格说明，不再提前改动主循环节奏。
+   D1 kickoff、D2 工作、D4 异常、D7 好感、D9 二级方向，每个周目都一致。 */
 function applyNgPlusTutorial(s){
-  if((typeof META !== "undefined") && META && META.finishedRuns >= 1){
-    s.tutorial.workUnlockedDay = 1;
-    s.tutorial.abnormalUnlockDay = 1;
-    s.tutorial.affinityUnlockDay = 1;
-    s.tutorial.directionUnlockPhase = "intro";
-  }
+  if(!s.tutorial) s.tutorial = {};
+  s.tutorial.workUnlockedDay = 2;
+  s.tutorial.abnormalUnlockDay = 4;
+  s.tutorial.affinityUnlockDay = 7;
+  s.tutorial.directionUnlockPhase = "dev";
+  if(!s.tutorial.hintsShown) s.tutorial.hintsShown = {};
+  s.tutorial.metaEchoUnlocked = !!((typeof META !== "undefined") && META && META.finishedRuns >= 1);
   return s;
 }
 function freshState(){
@@ -1792,13 +1844,14 @@ function freshState(){
     phase: "intro",
     phaseBossDay: 8,
     finalReviewDay: 15,
-    /* v0.10: 教学阶梯 — 好感度延后到 D7 才出数值，NG+ 钩子会全部压到 1 */
+    /* v0.10.3: 教学阶梯是主 loop 的一部分，多周目也不提前解锁 */
     tutorial: {
       workUnlockedDay: 2,
       abnormalUnlockDay: 4,
       affinityUnlockDay: 7,
       directionUnlockPhase: "dev",
       hintsShown: {},   /* 各类教学提示是否已经投放过 */
+      metaEchoUnlocked: false,
     },
     keywords:[],
     flags:{},
@@ -1910,10 +1963,116 @@ const MEMORY_TOTAL = 24;
 function recordMemory(t){
   if(!state.memoryFragments.includes(t)){
     state.memoryFragments.push(t);
+    if(META && META.memories){
+      META.memories.add(t);
+      saveMeta();
+    }
     floatText("记起来一点："+t);
     if(state.memoryFragments.length >= 3) state.amnesia = false;
     if(state.memoryFragments.length >= MEMORY_TOTAL) achv("memory_full");
   }
+}
+function allKnownMemories(){
+  const mem = new Set();
+  if(META && META.memories) for(const m of META.memories) mem.add(m);
+  if(state && state.memoryFragments) for(const m of state.memoryFragments) mem.add(m);
+  return mem;
+}
+const MEMOIR_CHAPTERS = [
+  {
+    id:"wake", title:"一 · 醒来时没有名字",
+    keys:["男睡眠仓 · 你不知道为什么","第一次走进了「♀」的那一边","睡眠仓里的低频蜂鸣","自己其实想哭很久了"],
+    text:"你最早记得的不是名字，而是一只金属舱门。\n舱壳上贴着符号，像世界强行替你决定了位置。\n你醒来时不知道昨晚怎么进去，也不知道自己究竟该归属哪一边。\n后来你才发现，这不是一个关于性别的谜题，而是一个关于「我是否能由自己定义」的谜题。"
+  },
+  {
+    id:"borrowed", title:"二 · 被借调来的人",
+    keys:["项目还没立项","项目失败 = 全员被裁","公司在裁员","行业最热的那段时间","有些人也曾经相信过"],
+    text:"你不是主角。至少公司不是这么看你的。\n你是从一个没通过立项的项目里被借过来的替补，是那个「什么都能干一点」的人。\n这句话听起来像夸奖，实际像一张没有写薪资的岗位说明。\n你开始明白：项目不是一个游戏，它是大家暂时还没被裁掉的理由。"
+  },
+  {
+    id:"office", title:"三 · 同事们各自的出口",
+    keys:["田也睡不好","有人和你一样想做独立游戏","一次没被说谢谢的善意","假装自己是行业老兵的那 5 分钟","烟雾里那个项目的名字","有人离开过这里","有人被裁了"],
+    text:"这层楼里没有真正的 NPC。\n田睡不好，小林也想做自己的东西，GZ 的家里还有医院的事，Yusha 只是比你更早学会了不把话说满。\n你们互相递水、背锅、装作没看见对方崩溃。\n有时候这叫团队协作。有时候这只是几个快沉下去的人，刚好抓住了同一块木板。"
+  },
+  {
+    id:"body", title:"四 · 身体开始替你说话",
+    keys:["把自己洗成成年人的样子","在卫生间躲过一次","公司厕所里那 15 分钟","第一次知道自己腰这里也会疼","镜子里的那个人不是你以为的样子","天台上退后的那一步","一个人在茶水间吃完一整顿饭"],
+    text:"你一开始以为崩溃是一种情绪。\n后来你发现它更像身体的行政通知：肩膀、胃、牙关、眼前发黑、心跳过快。\n你在卫生间躲过，在茶水间吃完过一顿饭，在健身房对着镜子确认自己还在。\n身体并不高尚，但身体从不写 PPT。它只会告诉你：这里真的有点不对。"
+  },
+  {
+    id:"demo", title:"五 · 那个没有提交的 demo",
+    keys:["天台上的那个 demo","“这条路” 这个游戏的雏形","自己曾经想跳","自己也想去 livehouse","天台上数飞机的那个晚上","跟一架飞机道别"],
+    text:"你一直在想另一个游戏。\n它可能是天台、宜山路、夜里的飞机、吸烟区里没点燃的烟，或者一个没人会立项的小 demo。\n你没有把它说出口，因为说出口就要负责。\n但每一次摸鱼、每一次数飞机、每一次看向电梯门，你都在偷偷给它加一行代码。"
+  },
+  {
+    id:"loop", title:"六 · 如果这不是第一次",
+    keys:["项目失败 = 全员被裁","天台上数飞机的那个晚上","有人和你一样想做独立游戏","一个人在茶水间吃完一整顿饭"],
+    text:"当周目开始重复，记忆不再像回忆，反而像存档里的脏数据。\n你知道 D8 会有评审，知道 D15 会有人问命名，知道某些人会在同一小时站在同一格。\n于是问题变了：\n如果命运已经被写成循环，你的选择还算选择吗？\n还是说，真正的选择正是你明知道循环仍然按下的那个键？"
+  },
+];
+function memoirUnlockedCount(){
+  const mem = allKnownMemories();
+  let got = 0;
+  for(const c of MEMOIR_CHAPTERS){
+    if(c.keys.some(k=>mem.has(k))) got++;
+  }
+  return got;
+}
+function recordPersonalChoice(kind, value){
+  if(!META.personalChoices) META.personalChoices = {};
+  const bucket = META.personalChoices[kind] || { last:null, counts:{}, contradictions:0 };
+  if(bucket.last && bucket.last !== value){
+    bucket.contradictions = (bucket.contradictions || 0) + 1;
+  }
+  bucket.last = value;
+  bucket.counts[value] = (bucket.counts[value] || 0) + 1;
+  META.personalChoices[kind] = bucket;
+  saveMeta();
+  return bucket;
+}
+function metaChoiceContradictionLine(bucket){
+  if(!bucket || !bucket.contradictions) return null;
+  const n = bucket.contradictions;
+  if(n === 1) return "这是否有些不太对？\n你上一次不是这样回答的。\n你忽然感觉自己的命运被某只手拨了一下。";
+  if(n === 2) return "你又改口了。\n这不像成长，更像有人在调试你。\n「我是否感觉我的命运被操控？」这个念头像一行报错。";
+  return "答案们互相覆盖。\n你像一个被反复读取、反复写入的变量。\n如果有人在操控命运，为什么每一次都让你记得一点点？";
+}
+function maybeMetaSelfChoiceSteps(){
+  if(!META || META.finishedRuns < 1) return [];
+  return [{
+    type:"choice", name:"系统 · 上一周目的残留",
+    prompt:"舱门打开前，你先听见一个问题。\n这不是 MBTI 的问题。\n这更像有人在问：\n「这一周，你准备把自己交给什么？」",
+    options8:{ _plain:[
+      {text:"交给项目：这次我要把它做出来", fn:()=>{
+        const b = recordPersonalChoice("fate", "project");
+        inject([
+          {type:"say", name:"系统", text:"你选择相信项目。\n至少在今天早上，它还是一个可以被推进的东西。"},
+          ...(metaChoiceContradictionLine(b) ? [{type:"say", name:"系统", metaGlitch:true, text:metaChoiceContradictionLine(b)}] : []),
+        ]);
+      }},
+      {text:"交给自己：这次我要保住那个 demo", fn:()=>{
+        const b = recordPersonalChoice("fate", "self");
+        inject([
+          {type:"say", name:"系统", text:"你选择相信自己。\n不是那个会汇报的自己，是那个下班后还想打开工程的自己。"},
+          ...(metaChoiceContradictionLine(b) ? [{type:"say", name:"系统", metaGlitch:true, text:metaChoiceContradictionLine(b)}] : []),
+        ]);
+      }},
+      {text:"交给同事：这次我不想一个人过", fn:()=>{
+        const b = recordPersonalChoice("fate", "others");
+        inject([
+          {type:"say", name:"系统", text:"你选择相信别人。\n这听起来很危险，但你已经一个人循环太久了。"},
+          ...(metaChoiceContradictionLine(b) ? [{type:"say", name:"系统", metaGlitch:true, text:metaChoiceContradictionLine(b)}] : []),
+        ]);
+      }},
+      {text:"交给循环：让我看看它还会怎么坏掉", fn:()=>{
+        const b = recordPersonalChoice("fate", "loop");
+        inject([
+          {type:"say", name:"系统", text:"你选择盯着循环本身。\n这不是反抗，也不是服从。更像一次带着疲惫的测试。"},
+          ...(metaChoiceContradictionLine(b) ? [{type:"say", name:"系统", metaGlitch:true, text:metaChoiceContradictionLine(b)}] : []),
+        ]);
+      }},
+    ]}
+  }];
 }
 
 /* v0.10: 主角自白库 — 自嘲 / 兴奋 / 难过 / 躯体化
@@ -2013,6 +2172,7 @@ function nextStep(){
     endScene(); return;
   }
   const step = scene[sceneIdx++];
+  state.flags._metaGlitchLine = !!step.metaGlitch;
   if(step.type==="say"){
     document.getElementById("dName").innerText = step.name || "";
     document.getElementById("dName").style.display = step.name ? "block":"none";
@@ -2062,9 +2222,10 @@ function renderBody(){
     }
   }
   const body = document.getElementById("dBody");
-  if(state.specialState && (state.specialState.name==="depressed" || state.specialState.name==="hallu")){
+  const metaGlitch = state.flags && state.flags._metaGlitchLine;
+  if(metaGlitch || (state.specialState && (state.specialState.name==="depressed" || state.specialState.name==="hallu"))){
     body.classList.add("glitch");
-    if(state.specialState.name==="hallu" && Math.random() < 0.06){
+    if((metaGlitch || state.specialState.name==="hallu") && Math.random() < 0.06){
       const pos = Math.floor(Math.random()*html.length);
       html = html.slice(0,pos) + "█" + html.slice(pos);
     }
@@ -2846,6 +3007,71 @@ function npcNameShort(n){
 function getNpcById(id){
   return NPCS.find(n=>n.id===id) || null;
 }
+function metaEndingHint(){
+  if(!META || !META.endings) return "上一次的那个项目";
+  if(META.endings.has("indie_dev")) return "那封离职信后面的 demo";
+  if(META.endings.has("review_pass_indie") || META.endings.has("review_pass")) return "上一次评审通过的那个项目";
+  if(META.endings.has("phase_boss_fail")) return "上一次没活到开发期的那个项目";
+  if(META.endings.has("review_fail")) return "上一次终评失败的那个项目";
+  if(META.endings.has("escape_quit") || META.endings.has("escape_quit_indie")) return "上一次从电梯离开的那个人";
+  return "上一次的那个项目";
+}
+function metaEraseText(t){
+  return t.replace(/[^\n，。！？、：；（）《》「」 ·]/g, ch=>{
+    if(ch === " ") return " ";
+    return Math.random() < 0.82 ? "█" : ch;
+  });
+}
+function maybeMetaNpcEcho(n){
+  if(!state.tutorial || !state.tutorial.metaEchoUnlocked) return null;
+  if(!META || META.finishedRuns < 1) return null;
+  /* 只做叙事回声，不改数值、不解锁系统；每次 NPC 对话小概率出现。 */
+  if(Math.random() > 0.22) return null;
+  const topic = metaEndingHint();
+  const pools = {
+    tian: [
+      "田忽然皱了一下眉。\n\"我是不是跟你说过，"+topic+"？\"\n他停了停，又摇头。\n\"算了，可能是昨晚没睡。\"",
+      "田看着你，像在认另一张脸。\n\"你上次也是这个点醒的。\"\n话说出口后，他自己先愣住了。"
+    ],
+    lin: [
+      "小林盯着你的屏幕。\n\"这个项目名……我是不是在上周见过？\"\n他伸手想指，屏幕闪了一下。\n\"不对，我记错了。\"",
+      "小林说：\"如果我们这次还没过——\"\n他忽然停住。\n\"为什么我要说'还'？\""
+    ],
+    cheng: [
+      "橙子翻了翻会议记录。\n\"这里有一页不属于今天。\"\n她念到一半，纸面上的字开始发白。\n\"……算了，删掉。\"",
+      "橙子低声说：\"我总觉得这份排期被人跑过一次。\"\n她把那句话划掉，没有解释。"
+    ],
+    zheye: [
+      "哲也看着日志。\n\"这里有一条 commit，时间戳是下周。\"\n他把屏幕转给你时，那行字已经没了。",
+      "哲也说：\"缓存里有一份旧 build。\"\n他敲了几下键盘。\n\"但 hash 不存在。\""
+    ],
+    mimi: [
+      "米米说她梦见过你。\n\"不是今天这个你，是另一个版本。\"\n她想了一下，把草稿纸翻了过去。",
+      "米米拿出一张线稿。\n画面上是"+topic+"。\n你眨眼的时候，那张纸变成了空白。"
+    ],
+    yusha: [
+      "Yusha 看了你很久。\n\"你上次也这么站。\"\n她很快补了一句：\"我是说，像上次开会那样。\"",
+      "Yusha 说：\"有些项目不会死，只会换一个人记得。\"\n她像是没说过这句话一样继续整理护腕。"
+    ],
+    gz: [
+      "GZ 盯着白板。\n\"这个坑我填过。\"\n他说完又把那行擦掉。\n\"不对，我没填过。\"",
+      "GZ 小声说：\"我妈那天也在医院。\"\n你不知道他指的是哪一天。"
+    ],
+  };
+  const list = pools[n.id] || [
+    npcNameShort(n)+"像是想起了什么。\n\"我们是不是见过不止一次？\"\n下一秒，"+pronoun()+"把这句话吞了回去。"
+  ];
+  const raw = list[Math.floor(Math.random()*list.length)];
+  const erased = Math.random() < 0.35;
+  return {
+    type:"say",
+    name:n.name,
+    metaGlitch: erased,
+    text: erased
+      ? "屏幕和日光灯同时闪了一下。\n\n" + metaEraseText(raw) + "\n\n（那句话像被什么东西抹掉了。）"
+      : raw,
+  };
+}
 function npcBondFlavor(n){
   const route = state.npcBondRoute && state.npcBondRoute[n.id];
   if(route==="romance"){
@@ -2988,9 +3214,9 @@ function adjustNpcAffinity(npcId, fnTag, group){
   const nowV = clamp(oldV + delta, 0, 50);
   state.npcAffinity[npcId] = nowV;
   const sign = nowV-oldV >= 0 ? "+" : "";
-  /* v0.10: affinityUnlockDay 之前 / 一周目，完全隐藏数值，只用模糊文字 */
+  /* v0.10.3: 好感数值也是主 loop，不因 NG+ 提前显示 */
   const affDay = (state.tutorial && state.tutorial.affinityUnlockDay) || 7;
-  const reveal = (state.day >= affDay) || (META && META.finishedRuns >= 1);
+  const reveal = state.day >= affDay;
   if(reveal){
     showToast(npcNameShort(n)+" 好感 " + sign + (nowV-oldV) + " · " + nowV + "/50", "note");
   } else {
@@ -3015,7 +3241,6 @@ function maybeShowAffinityUnlockTutorial(){
   const affDay = (state.tutorial && state.tutorial.affinityUnlockDay) || 7;
   if(state.day < affDay) return;
   if(state.tutorial.hintsShown.affinityUnlock) return;
-  if((typeof META !== "undefined") && META.finishedRuns >= 1) return;
   state.tutorial.hintsShown.affinityUnlock = true;
   runScene([
     {type:"say", name:"系统",
@@ -3041,10 +3266,11 @@ function talkTo(n){
   }
   /* v0.10: D7 第一次对话时，先把好感系统讲清楚 */
   maybeShowAffinityUnlockTutorial();
+  const metaEcho = maybeMetaNpcEcho(n);
   const favor = state.npcAffinity[n.id] || 0;
-  /* v0.10: 一周目 D7 之前隐藏数字 */
+  /* v0.10.3: 多周目同样 D7 前隐藏数字，避免主 loop 被 NG+ 打破 */
   const affDay = (state.tutorial && state.tutorial.affinityUnlockDay) || 7;
-  const reveal = (state.day >= affDay) || (META && META.finishedRuns >= 1);
+  const reveal = state.day >= affDay;
   if(favor >= 40 && !state.npcBondRoute[n.id]){
     const base = npcDialog(n);
     const bondPrompt = reveal
@@ -3065,6 +3291,7 @@ function talkTo(n){
           inject([{type:"say", name:n.name, text:"行。\n我们先把今天活完。"}]);
         }},
       }},
+      ...(metaEcho ? [metaEcho] : []),
       ...base,
     ]);
     return;
@@ -3074,6 +3301,7 @@ function talkTo(n){
   /* v0.9: 阶段+好感分层前奏（intro/dev × low/mid/high）*/
   const tier = phaseAffinityIntro(n);
   const prelude = [];
+  if(metaEcho) prelude.push(metaEcho);
   if(tier) prelude.push({type:"say", name:n.name, text:tier});
   if(bond) prelude.push({type:"say", name:n.name, text:bond});
   runScene(prelude.length ? [...prelude, ...base] : base);
@@ -3450,12 +3678,8 @@ function interactColleagueDesk(x, y){
   }
 }
 
-/* v0.9: 是否解锁二级方向 = phase 已经达到 tutorial.directionUnlockPhase。
-   一周目默认 directionUnlockPhase = "dev"，即 D8 评审通过后才解锁；
-   NG+ 改为 "intro"，第 1 天起就能选方向。 */
+/* 二级方向是主循环锁：所有周目都必须到 dev phase 才能进入。 */
 function isDirectionUnlocked(){
-  const t = state.tutorial || {};
-  if(t.directionUnlockPhase === "intro") return true;
   return state.phase === "dev";
 }
 function pickWorkOrDirection(fn){
@@ -6019,7 +6243,7 @@ function leaveBoot(){
 
 /* ===== 标题菜单 (v0.7.0.0.5) ===== */
 let titleMenuSel = 0;
-const TITLE_MENU_IDS = ["btnContinue","btnNew","btnDict","btnAchv"];
+const TITLE_MENU_IDS = ["btnContinue","btnNew","btnMemoir","btnDict","btnAchv"];
 function showTitleMenu(){
   titleShown = true;
   document.getElementById("title").classList.remove("hide");
@@ -6060,6 +6284,8 @@ function pickTitleMenu(){
   } else if(id === "btnNew"){
     clearRunSave();
     leaveTitle();
+  } else if(id === "btnMemoir"){
+    openMemoir();
   } else if(id === "btnDict"){
     openDict();
   } else if(id === "btnAchv"){
@@ -6145,8 +6371,8 @@ function continueRun(){
   showToast("载入存档：DAY " + state.day + " · " + String(state.hour).padStart(2,"0") + ":" + String(state.minute).padStart(2,"0"));
 }
 
-/* ===== 黑话字典 / 成就 视图 ===== */
-let dictOpen = false, achvOpen = false;
+/* ===== 黑话字典 / 成就 / 个人叙事 视图 ===== */
+let dictOpen = false, achvOpen = false, memoirOpen = false;
 function openDict(){
   dictOpen = true;
   const grid = document.getElementById("dictGrid");
@@ -6201,6 +6427,72 @@ function closeAchv(){
   achvOpen = false;
   document.getElementById("achvView").classList.remove("show");
 }
+function memoirFinalMetaLine(got, total){
+  const endings = META.endings || new Set();
+  const choices = META.personalChoices || {};
+  const fate = choices.fate || { counts:{}, contradictions:0 };
+  const top = Object.entries(fate.counts || {}).sort((a,b)=>b[1]-a[1])[0];
+  const picked = top ? top[0] : null;
+  const choiceLine = {
+    project:"你一次又一次把自己交给项目。\n但项目每次都会换名字，只有你还在。",
+    self:"你一直在保住那个 demo。\n它有时候叫 demo，有时候叫辞职，有时候只是「不要忘」。",
+    others:"你选择过同事。\n这让循环显得不那么像牢房，更像一群人共享的一次坏梦。",
+    loop:"你开始观察循环。\n观察久了以后，循环也开始观察你。",
+  }[picked] || "你还没有在周目开始时回答那个问题。\n也许下一次，舱门打开前它会再问。";
+  const endingLine =
+    endings.has("indie_dev") ? "某个版本里，你真的递交了离职信。\n系统没有阻止你，只是在结尾记了一笔。" :
+    endings.has("review_pass") || endings.has("review_pass_indie") ? "某个版本里，项目通过了。\n那并不等于你得救了，但至少证明你可以把一天推到下一天。" :
+    endings.has("phase_boss_fail") ? "某个版本里，项目没活到开发期。\n可你又从睡眠仓里醒来，像有人不接受那个结论。" :
+    endings.has("escape_quit") || endings.has("escape_quit_indie") ? "某个版本里，你从电梯离开。\n门关上的时候，世界没有崩塌，只是换了一个存档槽。" :
+    "还没有任何结局真正写死你。\n这很可怕，也很自由。";
+  const contradictionLine = fate.contradictions
+    ? "\n\n你已经 "+fate.contradictions+" 次改变了开场回答。\n这是否有些不太对？\n你是否感觉自己的命运被操控？\n\n也许不是命运被操控。\n也许是你终于发现，命运一直是可编辑的。"
+    : "\n\n你的回答目前还没有互相打架。\n系统看起来很平静。\n这不一定是好事。";
+  if(got >= total){
+    return "所有章节都亮起来了。\n\n"+choiceLine+"\n\n"+endingLine+contradictionLine+"\n\n田、橙子、小林、Yusha、哲也、GZ、米米……他们没有站在这里，但他们都在这段叙事里留下了手印。\n\n最后一行不是结论，而是一句疑问：\n如果我已经知道自己会被重新打开，我还要不要继续选择？";
+  }
+  return "还有 "+(total-got)+" 段叙事没有完全显形。\n\n"+choiceLine+"\n\n"+endingLine+contradictionLine+"\n\n继续把记忆捡回来。\n不是为了拼出真相，而是为了确认：被删掉的东西，并不一定真的不存在。";
+}
+function openMemoir(){
+  memoirOpen = true;
+  const mem = allKnownMemories();
+  const wrap = document.getElementById("memoirWrap");
+  wrap.innerHTML = "";
+  let got = 0;
+  for(const c of MEMOIR_CHAPTERS){
+    const hits = c.keys.filter(k=>mem.has(k));
+    const complete = hits.length > 0;
+    if(complete) got++;
+    const box = document.createElement("div");
+    box.className = "memoirChapter " + (complete ? "complete" : "missing");
+    const title = document.createElement("div");
+    title.className = "ctitle";
+    title.innerText = complete ? c.title : "█ · 还没有被想起来";
+    const body = document.createElement("div");
+    body.className = "body";
+    body.innerText = complete
+      ? c.text
+      : "这一章还缺少足够的碎片。\n你知道那里有东西，但现在只能看见白噪音。";
+    const keys = document.createElement("div");
+    keys.className = "keys";
+    keys.innerText = complete
+      ? "已接入碎片：" + hits.join(" / ")
+      : "可能需要：睡眠仓、工位、天台、茶水间、同事、异常状态或某个结局。";
+    box.appendChild(title); box.appendChild(body); box.appendChild(keys);
+    wrap.appendChild(box);
+  }
+  document.getElementById("memoirStats").innerText =
+    "已显形章节  " + got + "  /  " + MEMOIR_CHAPTERS.length +
+    "  ·  跨周目记忆 " + mem.size + " 条  ·  累计完成 " + META.finishedRuns + " 周目";
+  const meta = document.getElementById("memoirMeta");
+  meta.innerText = memoirFinalMetaLine(got, MEMOIR_CHAPTERS.length);
+  meta.classList.toggle("glitch", got >= MEMOIR_CHAPTERS.length || ((META.personalChoices && META.personalChoices.fate && META.personalChoices.fate.contradictions) || 0) >= 2);
+  document.getElementById("memoirView").classList.add("show");
+}
+function closeMemoir(){
+  memoirOpen = false;
+  document.getElementById("memoirView").classList.remove("show");
+}
 function leaveMbtiIntro(){
   if(!mbtiIntroOn) return;
   mbtiIntroOn = false;
@@ -6244,6 +6536,8 @@ function bindOpeningClicksOnce(){
   if(dv) dv.addEventListener("click", function(){ closeDict(); });
   const av = document.getElementById("achvView");
   if(av) av.addEventListener("click", function(){ closeAchv(); });
+  const mv = document.getElementById("memoirView");
+  if(mv) mv.addEventListener("click", function(){ closeMemoir(); });
 }
 
 function bootOpening(){
@@ -6341,6 +6635,7 @@ function confirmAnswer(){
        text:"舱壳上贴着「♂」。\n你不记得昨晚是怎么进去的。\n你也不记得自己叫什么。\n\n但你的本能在告诉身体：\n9 点要打卡。"},
       {type:"say", name:"系统",
        text:"——  第 1 天 · MON · 09:00  ——\n（你刚要从舱里坐起来，\n外面有人探头进来。）"},
+      ...maybeMetaSelfChoiceSteps(),
       /* 自动接续 introTian 选项分支（不再让玩家走过去触发） */
       ...introTianScene(),
     ]);
@@ -6373,6 +6668,12 @@ function handleKeydown(e){
     if(achvOpen){
       if(e.key==="x"||e.key==="X"||e.key==="Escape"||e.key==="Enter"||e.key==="z"||e.key==="Z"){
         e.preventDefault(); closeAchv();
+      }
+      return;
+    }
+    if(memoirOpen){
+      if(e.key==="x"||e.key==="X"||e.key==="Escape"||e.key==="Enter"||e.key==="z"||e.key==="Z"){
+        e.preventDefault(); closeMemoir();
       }
       return;
     }
